@@ -301,6 +301,7 @@ namespace Tensile
             DataType              eType                   = DataType::Float;
             bool                  highPrecisionAccumulate = false;
             bool                  useBeta                 = true;
+            bool                  useGradient             = false;
             bool                  useBias                 = false;
             bool                  useE                    = false;
             bool                  useScaleD               = false;
@@ -311,6 +312,7 @@ namespace Tensile
             bool                  fp16AltImpl             = false;
             ActivationType        activationType          = ActivationType::None;
             bool                  activationHPA           = false;
+            bool                  activationGuard         = false;
             std::vector<DataType> biasDataTypeWhiteList;
         };
 

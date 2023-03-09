@@ -912,7 +912,14 @@ namespace Tensile
         if(problemType.useE)
         {
             auto s = TypeAbbrev(problem.tensors()[ContractionProblemGemm::TENSOR::E].dataType());
-            name += ("_Aux" + s);
+            if(problemType.useGradient)
+            {
+                name += ("_Grad" + s);
+            }
+            else
+            {
+                name += ("_Aux" + s);
+            }
         }
 
         if(problem.activationType() != ActivationType::None)
@@ -929,6 +936,10 @@ namespace Tensile
         if(problem.activationHPA())
         {
             name += "h";
+        }
+        if(problem.activationGuard())
+        {
+            name += "g";
         }
 
         if(problemType.useScaleD)
