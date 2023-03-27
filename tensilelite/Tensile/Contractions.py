@@ -65,7 +65,7 @@ class BoundIndex:
 
 class ProblemType:
     StateKeys = ['operationIdentifier', 'aType', 'bType', 'cType', 'dType', 'eType',
-                 'useBeta', 'useBias', 'useE', 'useScaleD', 'biasDataTypeWhiteList', 'highPrecisionAccumulate',
+                 'useBeta', 'useBias', 'biasSrcWhiteList', 'useE', 'useScaleD', 'biasDataTypeWhiteList', 'highPrecisionAccumulate',
                  'useInitialStridesAB', 'useInitialStridesCD', 'stridedBatched', 'groupedGemm',
                  'useGradient', 'activationType', 'activationHPA', 'activationGuard']
     @classmethod
@@ -170,6 +170,7 @@ class ProblemType:
 
         rv.useBias               = False
         rv.biasDataTypeWhiteList = []
+        rv.biasSrcWhiteList = []
         if 'UseBias' in d:
             rv.useBias = d['UseBias']
             if 'BiasDataTypeList' in d:
@@ -177,6 +178,9 @@ class ProblemType:
                 rv.biasDataTypeWhiteList = d['BiasDataTypeList']
             else:
                 rv.biasDataTypeWhiteList = getBiasDataTypeListDefault(d)
+            if 'BiasSrc' in d:
+                m = ["A", "B", "C", "D"]
+                rv.biasSrcWhiteList = [m.index(d['BiasSrc'])]
 
         rv.useE = False
         if 'UseE' in d:
@@ -312,6 +316,7 @@ class ProblemType:
             predicates.append(ProblemPredicate("ActivationGuard", value=self.activationGuard))
             predicates.append(ProblemPredicate("UseGradient", value=self.useGradient))
             predicates.append(ProblemPredicate("UseBias", value=self.useBias))
+            predicates.append(ProblemPredicate("BiasSrcWhiteList", value=self.biasSrcWhiteList))
             predicates.append(ProblemPredicate("StridedBatched", value=self.stridedBatched))
             predicates.append(ProblemPredicate("GroupedGemm", value=self.groupedGemm))
             predicates.append(ProblemPredicate("UseScaleD", value=self.useScaleD))
