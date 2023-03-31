@@ -1687,12 +1687,17 @@ class VMacF32(CommonInstruction):
 # Dot
 class VDot2CF32F16(CommonInstruction):
     def __init__(self, dst, src0, src1, sdwa: Optional[SDWAModifiers] = None, comment="") -> None:
-        super().__init__(InstType.INST_F32, dst, [src0, src1], sdwa, None, comment)
+        super().__init__(InstType.INST_F32, dst, [src0, src1], sdwa, None, None, comment)
         self.setInst("v_dot2c_f32_f16")
 
     def preStr(self):
         if self.kernel.isa[0] >= 11:
             self.setInst("v_dot2acc_f32_f16")
+
+class VDot2F32F16(CommonInstruction):
+    def __init__(self, dst, src0, src1, src2, vop3: Optional[VOP3PModifiers] = None, comment="") -> None:
+        super().__init__(InstType.INST_F32, dst, [src0, src1, src2], None, vop3, comment)
+        self.setInst("v_dot2_f32_f16")
 
 # Fma
 class VFmaF16(CommonInstruction):

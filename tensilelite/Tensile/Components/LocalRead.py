@@ -1,6 +1,6 @@
 ################################################################################
 #
-# Copyright (C) 2022 Advanced Micro Devices, Inc. All rights reserved.
+# Copyright (C) 2022-2023 Advanced Micro Devices, Inc. All rights reserved.
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -76,7 +76,7 @@ class LocalReadMFMA(LocalRead):
         else:
             numReadsPerUnroll = tP["bpe"] * writer.states.lrvwB // int(blockWidth * 4) # bytes/register
         numVgpr  = int(ceil(blockWidth))
-
+        print(tc, tile01, kernel["MIWaveTile"][tile01])
         # pack register
         needPack = blockWidth < 1
         pack     = Module("pack%s_I%s"%(tc,iui))
@@ -85,7 +85,6 @@ class LocalReadMFMA(LocalRead):
             tmpVgprIdx = writer.vgprPool.checkOut(writer.states.a.numVgprValuPerBlock*writer.states.numReadsIterCoalescedA*packTimesPerVgpr if tc == 'A' \
                 else writer.states.b.numVgprValuPerBlock*writer.states.numReadsIterCoalescedB*packTimesPerVgpr)
             pack.addTempVgpr(tmpVgprIdx) # important, add to pack Module for later CheckIn
-
         valufIdx = 0
         for vIdx in range(0, numVectorsPerTile):
             for eIdx in range(0, numReadPerTileVector):
@@ -168,8 +167,8 @@ class LocalReadMFMA(LocalRead):
 
                         paramList.append(int(offset_val))
 
-                    comment = "L -> Reg lro=%d swapByteOffset=%u ti=%u vIdx=%u rIdx=%u oIdx=%u buffer=%u iui=%u" \
-                            % (tP["localReadOffset"], tP["localReadSwapByteOffset"], MIWaveGroupShape[tile01], vIdx, rIdx, oIdx, bufferIdx, iui)
+                    comment = "L -> Reg lro=%d swapByteOffset=%u ti=%u vIdx=%u eIdx=%u rIdx=%u oIdx=%u buffer=%u iui=%u" \
+                            % (tP["localReadOffset"], tP["localReadSwapByteOffset"], MIWaveGroupShape[tile01], vIdx, eIdx, rIdx, oIdx, bufferIdx, iui)
 
                     highBits = highBitsForHalf or isHigh16Bits
                     readToTempVgpr = highBitsForHalf or isHigh8Bits or isHigh16Bits

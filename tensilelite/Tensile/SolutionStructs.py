@@ -214,6 +214,9 @@ class ProblemType(Mapping):
 
     if "Gradient" in config:
       if config["Gradient"]:
+        if (not self["UseBias"]) and self["ActivationType"] == 'none':
+          printWarning("Gradient is disabled cause bias and activation are both disabled.")
+          self["Gradient"] = False
         if self["ActivationType"] != 'none' and self["UseE"] == False:
           printWarning("Use E is enabled cause Activation is enabled.")
           self["UseE"] = True
@@ -232,9 +235,9 @@ class ProblemType(Mapping):
         printWarning("BiasSrc is set to D cause Gradient is disabled.")
         self["BiasSrc"] = "D"
       elif self["Gradient"]:
-        # Currently only supports D :)
-        if config["BiasSrc"] != "D":
-          printExit("BiasSrc currently only supports D.")
+        # # Currently only supports D :)
+        # if config["BiasSrc"] != "D":
+        #   printExit("BiasSrc currently only supports D.")
         if config["BiasSrc"] not in biasSrcList:
           printExit("BiasSrc only supports A, B, D.")
 
@@ -1521,8 +1524,7 @@ class Solution(collections.abc.Mapping):
       state["MatrixInstruction"]  = [state["MatrixInstruction"][0],state["MatrixInstruction"][1],state["MatrixInstruction"][2],state["MatrixInstruction"][3]]
 
       waves                       = mi[7]* mi[8]
-      miwg0                       = mi[4] * mi[0] * mi[7]
-      state["WorkGroup"][0]       = miwg0
+      state["WorkGroup"][0]       = mi[4] * mi[0] * mi[7]
       state["WorkGroup"][1]       = waves*state["WavefrontSize"] // state["WorkGroup"][0]
       state["ThreadTile"][0]      = 1  # dummy
       state["ThreadTile"][1]      = 1  # dummy
@@ -1540,7 +1542,7 @@ class Solution(collections.abc.Mapping):
       state["EnableMatrixInstruction"] = True
 
       # set MIBlock
-      MIBlock_BM = miwg0 // mi[0]
+      MIBlock_BM = mi[4]
       MIBlock_BM = min(MIBlock_BM, mi[3])
       MIBlock_BN = mi[3] // MIBlock_BM
 
@@ -1554,7 +1556,7 @@ class Solution(collections.abc.Mapping):
 
       # set MIWaveGroup
       state['MIWaveGroup']     = [1, 1]
-      state['MIWaveGroup'][0]  = min((miwg0 // mi[0]) // MIBlock_BM, waves)
+      state['MIWaveGroup'][0]  = min(mi[7], waves)
       state['MIWaveGroup'][1]  = waves // state['MIWaveGroup'][0]
 
       # set MIWaveTile
@@ -3128,6 +3130,9 @@ class Solution(collections.abc.Mapping):
 
     # Bias reduction
     if state["ProblemType"]["UseBias"] and state["ProblemType"]["Gradient"]:
+      if (state["ProblemType"]["BiasSrc"] == "A" or state["ProblemType"]["BiasSrc"] == "B") and state["allowLRVWforTLUandMI"]:
+        # Block for not verified.
+        reject(state, "Bias reduction on A, B does not support allowLRVWforTLUandMI")
       if (state["_GlobalAccumulation"] == 'SingleBuffer') and state["GlobalSplitU"] > 1:
         reject(state, "GlobalSplitU > 1 only compatible with MultipleBuffer for bias reduction")
       if len(state["PackedC1IndicesX"]) > 1:

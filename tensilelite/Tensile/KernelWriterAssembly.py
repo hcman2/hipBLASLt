@@ -457,6 +457,10 @@ class KernelWriterAssembly(KernelWriter):
           # additional definition G2LB0, G2LB1 for swapping register sets
           module.add(RegSet("v", "vgprG2LB0", self.states.b.startVgprG2L))
           module.add(RegSet("v", "vgprG2LB1", self.states.b.startVgprG2L + self.states.b.numVgprG2L//2))
+
+    if kernel["ProblemType"]["Gradient"] and kernel["ProblemType"]["UseBias"] and (kernel["ProblemType"]["BiasSrc"] == "A" or kernel["ProblemType"]["BiasSrc"] == "B"):
+      module.add(RegSet("v", "vgprValuSum", self.states.bias.startVgprValu))
+
     if not kernel["LocalWriteUseSgprA"] and self.states.a.numVgprLocalWriteAddr > 0:
       module.add(RegSet("v", "vgprLocalWriteAddrA", \
           self.states.a.startVgprLocalWriteAddr))
@@ -3261,7 +3265,7 @@ class KernelWriterAssembly(KernelWriter):
   ##############################################################################
   # End Summation
   ##############################################################################
-  def endSummation(self, kernel, label = None):
+  def endSummation(self, kernel, tPA, tPB, label = None):
     module = Module("endSummation")
 
     module.add(Label((self.labels.getUniqueNamePrefix("Summation_End") if label is None else label), ""))
@@ -3270,7 +3274,136 @@ class KernelWriterAssembly(KernelWriter):
       module.add(SSetPrior(prior=0, comment="optimization store"))
 
     vbegin = self.states.a.startVgprValu
-    vsize = self.states.lastVgprForReads - self.states.a.startVgprValu
+    vsize = self.states.lastVgprForReads - vbegin
+
+    # Write bias A, B data to LDS
+    if kernel["ProblemType"]["Gradient"] and kernel["ProblemType"]["UseBias"] and (kernel["ProblemType"]["BiasSrc"] == "A" or kernel["ProblemType"]["BiasSrc"] == "B"):
+      # Free some vgpr
+      vbegin = self.states.a.startVgprValu
+      vsize = self.states.bias.startVgprValu - vbegin
+      self.vgprPool.add(vbegin, vsize, "free vgpr except sum K")
+      # Update vbegin and vsize
+      vbegin = self.states.bias.startVgprValu
+      vsize = self.states.lastVgprForReads - vbegin
+
+      # get constant parameter
+      tP             = tPA if kernel["ProblemType"]["BiasSrc"] == "A" else tPB
+      tc             = tP["tensorChar"]
+      tile01         = tP["tile01Idx"]
+      waveWidth      = self.states.kernel["WavefrontSize"]
+      mt             = kernel["MacroTile%u" % tile01]
+      flatWWorkGroup = kernel["SubGroup0"] * kernel["SubGroup1"] * kernel["LocalSplitU"]
+
+      wReg    = self.vgprPool.checkOut(1,"wReg") # quotient
+      tReg    = self.vgprPool.checkOut(1,"tReg") # remainder
+      kReg    = self.vgprPool.checkOut(1,"kReg") # remainder
+      tmpVgpr = self.vgprPool.checkOutAligned(2,2,"tmpVgpr")
+      tmpVgprRes = RegisterPoolResource(tmpVgpr, 2)
+      ldsVgpr = self.vgprPool.checkOut(1,"ldsVgpr")
+      ldsVgpr1 = self.vgprPool.checkOut(1,"ldsVgpr1")
+      dummy   = self.vgprPool.checkOut(1,"dummy")
+
+      # parameter for get each type index
+      dividendForKId   = kernel["MatrixInstM"] * kernel["MatrixInstB"]
+      num1DBlocks      = kernel["MatrixInstBM"] if (tile01 == 0) else kernel["MatrixInstBN"]
+      num1DBlocks1     = kernel["MatrixInstBN"] if (tile01 == 0) else kernel["MatrixInstBM"]
+      num1DWaves       = kernel["MIWaveGroup"][0] if (tile01 == 0) else kernel["MIWaveGroup"][1]
+      if kernel["SourceSwap"]:
+          dividedForBlkId  = kernel["MatrixInstM"] if (tile01 == 0) else (kernel["MatrixInstM"] * kernel["MatrixInstBM"])
+          dividedForBlkId1 = (kernel["MatrixInstM"] * kernel["MatrixInstBM"]) if (tile01 == 0) else kernel["MatrixInstM"]
+      else:
+          dividedForBlkId  = (kernel["MatrixInstN"] * kernel["MatrixInstBN"]) if (tile01 == 0) else kernel["MatrixInstN"]
+          dividedForBlkId1 = kernel["MatrixInstN"] if (tile01 == 0) else (kernel["MatrixInstN"] * kernel["MatrixInstBN"])
+      print("Lra", tc, kernel["SourceSwap"], kernel["MatrixInstBM"], kernel["MatrixInstBN"], tile01, dividedForBlkId)
+      dividedForWaveId = waveWidth if (tile01 == 0) else (waveWidth * kernel["MIWaveGroup"][0])
+      vectorWidth      = kernel["VectorWidth"] if ((tile01 == 0) and kernel["SourceSwap"]) else 1 # TODO: nonSwap VectorWidth
+
+      # strider for each type of index
+      # Calculate K
+      totalVgprToBeStoredInK = flatWWorkGroup * num1DBlocks * kernel["MIWaveGroup"][tile01] * kernel["MIWaveTile"][tile01] \
+                  // kernel["MatrixInstB"] // (kernel["MIWaveGroup"][0] * kernel["MIWaveGroup"][1]) // mt
+      strideTile       = totalVgprToBeStoredInK
+      strideBlock      = kernel["MatrixInstM"] * strideTile
+      strideWave       = kernel["MatrixInstM"] * num1DBlocks * strideTile * vectorWidth
+      with self.allocTmpSgpr(1) as tmpSgprInfo:
+        # tile offset
+        module.add(vectorStaticRemainder(dummy, kReg, "Serial", waveWidth, tmpVgprRes, tmpSgprInfo, \
+            "0. thread id in wave: wtid = tid %% wavelength(%u)" % waveWidth))
+        module.add(vectorStaticRemainder(dummy, tReg, kReg, kernel["MatrixInstN"], tmpVgprRes, tmpSgprInfo, \
+            "1. N offset: nIdx = wtid %% MI_N(%u)" % kernel["MatrixInstN"]))
+        module.add(staticMultiply(vgpr(tReg), vgpr(tReg), strideTile, tmpSgprInfo, \
+            "1. N offset: nOffset = nIdx * nStride(%u)" % strideTile))
+        # block offset
+        # Here we calculate the coordinate of the block offset, and remove the duplicated blocks.
+        # For example we have block = 2x2, source swap = False:
+        # 0 1
+        # 2 3
+        # For tile01 = 0 we should only use 0, 2. For tile01 = 1 we should only use 0, 1.
+        module.add(vectorStaticDivide(wReg, kReg, dividedForBlkId1, tmpVgprRes, \
+            "2-1. block offset: bnIdx = wtid / dividedForBlkId1(%u)" % dividedForBlkId1))
+        module.add(vectorStaticRemainder(dummy, wReg, wReg, num1DBlocks1, tmpVgprRes, tmpSgprInfo, \
+            "2-1. block offset: bnIdx = bnIdx %% num1DBlocks1(%u)" % num1DBlocks1))
+        module.add(VCmpXEqU32(dst=EXEC(), src0=vgpr(dummy), src1=0, comment="2-1. True if ans = 0"))
+        module.add(vectorStaticDivide(wReg, kReg, dividedForBlkId, tmpVgprRes, \
+            "2. block offset: bnIdx = wtid / dividedForBlkId(%u)" % dividedForBlkId))
+        module.add(vectorStaticRemainder(dummy, wReg, wReg, num1DBlocks, tmpVgprRes, tmpSgprInfo, \
+            "2. block offset: bnIdx = bnIdx %% num1DBlocks(%u)" % num1DBlocks))
+        module.add(staticMultiply(vgpr(wReg), vgpr(wReg), strideBlock, tmpSgprInfo, \
+            "2. block offset: bnOffset = bnIdx * strideBlock(%u)" % strideBlock))
+        module.add(VAddU32(dst=vgpr(tReg), src0=vgpr(wReg), src1=vgpr(tReg), \
+            comment="3. add N and block offset: bnOffset = block and N offset"))
+        module.add(staticMultiply(vgpr(tReg), vgpr(tReg), vectorWidth, tmpSgprInfo, \
+            "3. apply VectorWidth: bnOffset = bnOffset * vw(%u)" % vectorWidth))
+        # unroll offset
+        module.add(vectorStaticDivide(kReg, kReg, dividendForKId, tmpVgprRes, \
+            "4. K offset: kIdx = wtid / (MIN(%u) * MIBB(%u))" % (kernel["MatrixInstN"], kernel["MatrixInstB"])))
+        module.add(staticMultiply(vgpr(kReg), vgpr(kReg), 1, tmpSgprInfo, \
+            "4. K offset: lrKOffset = kIdx * mStride(1)"))
+
+        module.add(VAddU32(dst=vgpr(tReg), src0=vgpr(kReg), src1=vgpr(tReg), \
+            comment="5. offset in wave: lrOffset = bnOffset + lrKOffset"))
+        # wave offset
+        if num1DWaves > 1:
+          # FIXME: Should be two cases tile01 == 0 and tile01 == 1
+          module.add(vectorStaticDivide(wReg, "Serial", dividedForWaveId, tmpVgprRes, \
+              "6. wave offset in N dimen: wtid = tid / dividedForWaveId(%u)" % dividedForWaveId))
+          # Here we calculate the coordinate of the block offset, and remove the duplicated wave.
+          if tile01 == 0:
+            module.add(vectorStaticDivide(dummy, wReg, num1DWaves, tmpVgprRes, \
+              "6-1.mask duplicated: wtid0 = wtid / num1DWaves(%u)" % num1DWaves))
+          else:
+            module.add(vectorStaticDivide(dummy, "Serial", waveWidth, tmpVgprRes, \
+                "6-1. wave offset in N dimen (waveWidth): wtid = tid / waveWidth(%u)" % waveWidth))
+            module.add(vectorStaticRemainder(dummy, dummy, wReg, kernel["MIWaveGroup"][0], tmpVgprRes, tmpSgprInfo, \
+                "6-1. wave offset in M dimen (MIWaveGroup0): wtid0 = wtid % MIWaveGroup0(%u)" % kernel["MIWaveGroup"][0]))
+          module.add(VCmpXEqU32(dst=EXEC(), src0=vgpr(dummy), src1=0, comment="6-1. True if ans = 0"))
+          module.add(vectorStaticRemainder(dummy, wReg, wReg, num1DWaves, tmpVgprRes, tmpSgprInfo, \
+              "6. wave offset in M dimen: wtid0 = wtid %% num1DWaves(%u)" % num1DWaves))
+          module.add(staticMultiply(vgpr(wReg), vgpr(wReg), strideWave, tmpSgprInfo, \
+              "6. wave offset in M dimen: wOffset = wtid0 * W0Stride(%u)" % strideWave))
+          module.add(VAddU32(dst=vgpr(tReg), src0=vgpr(wReg), src1=vgpr(tReg), \
+              comment="7. final local read offset: flrOffset = lrOffset + WOffset"))
+          module.add(VLShiftLeftB32(dst=vgpr(tReg), src=vgpr(tReg), shiftHex=hex(log2(tP["bpe"])), \
+            comment="7: offset = offset*bpe" ))
+      # release register
+      self.vgprPool.checkIn(wReg)
+      self.vgprPool.checkIn(kReg)
+      self.vgprPool.checkIn(tmpVgpr)
+      self.vgprPool.checkIn(ldsVgpr)
+      self.vgprPool.checkIn(ldsVgpr1)
+      self.vgprPool.checkIn(dummy)
+      # tReg
+      self.vgprPool.checkIn(tReg)
+      MIWaveGroupShape = [ kernel["MatrixInstM"] * kernel["MatrixInstBM"] * kernel["MIWaveGroup"][0] * vectorWidth, \
+                           kernel["MatrixInstN"] * kernel["MatrixInstBN"] * kernel["MIWaveGroup"][1] * 1]
+      numReadPerTileVector = vectorWidth if (tile01 == 0) else 1
+      numVectorsPerTile    = kernel["MIWaveTile"][tile01] // numReadPerTileVector
+      for vIdx in range(0, numVectorsPerTile):
+          for eIdx in range(0, numReadPerTileVector):
+            # normal case
+            offset_val = (eIdx + vIdx * MIWaveGroupShape[tile01]) * totalVgprToBeStoredInK * tP["bpe"]
+      module.add(SSetMask(dst=EXEC(), src=-1, comment="reset mask" ))
+
 
     self.vgprPool.add(vbegin, vsize, "endSummation")
     module.addComment0("endSummation: add vgpr [%u...%u) to pool" % \
@@ -3300,6 +3433,8 @@ class KernelWriterAssembly(KernelWriter):
 
     if kernel["SuppressNoLoadLoop"]:
       module.add(SWaitCnt(lgkmcnt=0, vmcnt=0, vscnt=0, comment="wait for all summation activity"))
+
+    # Load bias data from LDS and write to global
 
     ########################################
     # Load kernel args needed by global write batch
@@ -3817,7 +3952,7 @@ class KernelWriterAssembly(KernelWriter):
             endSumLabel = "Summation_End_OptNLL"
 
             module.addComment0("Stores for OptNLL")
-            module.add(self.endSummation(kernel, endSumLabel))
+            module.add(self.endSummation(kernel, tPA, tPB, endSumLabel))
 
             # perhaps could work with LSU>1 by adding other indices here, but not tested
             assert (kernel["LocalSplitU"] == 1)
