@@ -8189,15 +8189,6 @@ class KernelWriterAssembly(KernelWriter):
       dstC = self.b2bgemmCalcInputVgprIdx(0, numAccVgprPerWave, m + n * waveTileM)
       srcA = self.b2bgemmCalcInputVgprIdx(a, numVgprRequiredPerVector, m)
       srcB = self.b2bgemmCalcInputVgprIdx(b, numVgprRequiredPerVector, n)
-      #hack code
-      tmpVgpr = self.vgprPool.checkOut(3)
-      module.add(VMovB32(vgpr(tmpVgpr), 0x50005000))
-      module.add(VMovB32(vgpr(tmpVgpr+1), 0xffff0000))
-      module.add(VMovB32(vgpr(tmpVgpr+2), 0x0000ffff))
-      #module.add(VAndB32(vgpr(srcA), vgpr(srcA), tmpVgpr+2))
-      #module.add(VAndB32(vgpr(srcA + numVgprRequiredPerVector - 1), vgpr(srcA + numVgprRequiredPerVector - 1), vgpr(tmpVgpr+2)))
-      module.add(SNop(8))
-      self.vgprPool.checkIn(tmpVgpr)
       inst = MFMAInstruction(miInInstType, miOutInstType, [miM, miN, miK], mfma_1k, \
                              accvgpr(dstC, numAccVgprPerWave), \
                              vgpr(srcA, numVgprRequiredPerVector), \
