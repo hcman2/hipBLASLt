@@ -7855,15 +7855,13 @@ class KernelWriterAssembly(KernelWriter):
 
     offsetVgpr = self.vgprPool.checkOut(1)
     numRegPerVec: int = round(vw * dstDataType.numRegisters())
-    print("========================== tWaviTileStride0, numT0InSingleWT = %s,%s" % (tWaviTileStride0,numT0InSingleWT))
-    
+
     for i, (t1, t0, vc1, vc0) in enumerate(elements):
       #TODO: handle vc1 or vc0 > 0
       assert (vc0, vc1) == (0, 0)
       jumpBM = t0 % numT0InSingleWT
       jumpWtM = t0 // numT0InSingleWT
       vectorByteOffset = (jumpBM * tStride0 + jumpWtM * tWaviTileStride0 + t1 * tStride1) * self.states.bpeCexternal
-      print("t1, t0, vc1, vc0 = %s,%s,%s,%s" % (t1, t0, vc1, vc0))
       mod.add(self.b2bgemmAddLocalWrite(vw, vectorByteOffset, archVgprIdx + i * numRegPerVec, coordByteOffsetVgpr))
 
     mod.add(SWaitCnt(lgkmcnt=0))
