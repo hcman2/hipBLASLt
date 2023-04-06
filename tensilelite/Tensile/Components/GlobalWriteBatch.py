@@ -516,9 +516,7 @@ class GlobalWriteBatchWriter:
       # Now read lds data back to registers and write to global memroy
       if self.ss.optSrdIncForRow and addrCalc.rowInc and self.kernel["StoreRemapVectorWidth"] > 0:
         module.addComment1("StoreRemap: shift coord1 address")
-        if self.kernel["ProblemType"]["UseE"] and (self.kernel["GlobalSplitU"] == 1):
-          printExit("Use E does not support StoreRemapVectorWidth if GSU == 1.")
-          # module.add(addrCalc.incrementToNextRow(self.kernel, "E", self.ss, self.tmpS01, isCompute=True))
+        module.add(addrCalc.incrementToNextRow(self.kernel, "E", self.ss, self.tmpS01, isCompute=True))
         module.add(addrCalc.incrementToNextRow(self.kernel, "D", self.ss, self.tmpS01))
         module.add(VMovB32(vgpr(self.tmpVgpr), addrCalc.rowInc, "set shift rows"))
         module.add(VAddU32(vgpr(self.parentWriter.vgprs.storeRemapCoord1), vgpr(self.parentWriter.vgprs.storeRemapCoord1), vgpr(self.tmpVgpr), "shift storeRemap coord1"))
@@ -539,7 +537,7 @@ class GlobalWriteBatchWriter:
             localLoadCnt = self.localLoadIssued - self.biasLoadIssued[elementIdx]
 
           waitLoadCnt = 0
-
+          waitLoadCntScaleDVskip = waitLoadCnt
           if self.kernel["ProblemType"]["UseScaleD"] and (dataScaleD not in scaleDWaitDict):
             waitLoadCnt = waitLoadCnt + self.scaleDLoadIssued[elementIdx]
 
@@ -563,12 +561,12 @@ class GlobalWriteBatchWriter:
           waitLoadCnt = 0
           waitLocalLoadCnt = -1
 
-          if self.beta: waitLoadCnt = elementIdx
+          if self.beta: waitLoadCnt = elementIdx + 1
           if self.kernel["ProblemType"]["UseBias"] and (dataBias not in biasWaitDict):
             waitLocalLoadCnt = self.localLoadIssued - self.biasLoadIssued[elementIdx]
 
-
-          if self.kernel["ProblemType"]["UseScaleD"]:
+          waitLoadCntScaleDVskip = waitLoadCnt
+          if self.kernel["ProblemType"]["UseScaleD"] and (dataScaleD not in scaleDWaitDict):
             waitLoadCnt = waitLoadCnt + self.scaleDLoadIssued[elementIdx]
 
           vmcnt = self.loadsIssued + self.loadsScaleDIssued - waitLoadCnt - 1
@@ -578,7 +576,7 @@ class GlobalWriteBatchWriter:
             vmComment = "{} = {} - {} - 1".format(vmcnt, self.loadsIssued, waitLoadCnt)
           else:
             waitStoreCnt = self.storesIssued if not self.kernel["GroupLoadStore"] else 0
-            vmComment = " {} = {}({},{}) - {}({},{}) + {} - 1".format(vmcnt + waitStoreCnt,
+            vmComment = " {} = {}{},{} - {},{},{} + {} - 1".format(vmcnt + waitStoreCnt,
                                                             self.loadsIssued+self.loadsScaleDIssued, self.loadsIssued, self.loadsScaleDIssued,
                                                             waitLoadCnt, elementIdx, self.scaleDLoadIssued[elementIdx],
                                                             waitStoreCnt)
@@ -632,7 +630,7 @@ class GlobalWriteBatchWriter:
       isActivationInsertAfter = False
       if self.kernel["ActivationFuncCall"]:
         if (activationCDataType == self.kernel["ProblemType"]["DestDataType"]) and \
-          (activationCDataType != self.kernel["ProblemType"]["ComputeDataType"]) and (self.kernel["ProblemType"]["UseScaleD"] == False):
+          (activationCDataType != self.kernel["ProblemType"]["ComputeDataType"]):
           isActivationInsertAfter = True
         activationModule = Module("ActivationFuncCall")
         if (not mergeActFuncCall) and (not isActivationInsertAfter):
@@ -642,7 +640,7 @@ class GlobalWriteBatchWriter:
           src=sgpr(self.activationSetPCStruct.sgprOffsetActivation, 2)))
         activationModule.appendModule (copyData(activationCDataType, self.ss.elementSumIdx[elementIdx], self.gwvw, \
           self.activationSetPCStruct.vgprActCopy, 1))
-      elif self.parentWriter.insertActivationAfterPacked(self.kernel, self.activationTypeStr) and (self.kernel["ProblemType"]["UseScaleD"] == False):
+      elif self.parentWriter.insertActivationAfterPacked(self.kernel, self.activationTypeStr):
         isActivationInsertAfter = True
         activationModule = self.parentWriter.getActivationDestDataType(self.kernel, self.activation, \
           self.activationTypeStr, self.gwvw, self.ss.elementSumIdx[elementIdx] , self.ss.elementSumIdx[elementIdx], self.tmpVgpr, self.tmpSgpr)
@@ -748,6 +746,10 @@ class GlobalWriteBatchWriter:
         module.add(convertModule)
         module.add(packModule)
         module.add(activationModule)
+        module.add(scaleDModule)
+        if self.kernel["ProblemType"]["UseScaleD"] and (self.kernel["GlobalSplitU"] == 1):
+          module.add(convertModule)
+          module.add(packModule)
       else:
         module.add(activationModule)
         module.add(scaleDModule)

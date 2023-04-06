@@ -23,7 +23,7 @@
 ################################################################################
 
 from ..TensileInstructions import Module, SMulI32, VAddLShiftLeftU32, VAddU32, VMulLOU32, \
-                            VMovB32, staticMultiply, vectorStaticDivide, \
+                            SWaitCnt, staticMultiply, vectorStaticDivide, \
                             vectorStaticRemainder, RegisterPoolResource, vgpr, sgpr, log2
 from ..Component import ComputeStoreVgprs
 
@@ -90,7 +90,11 @@ class ComputeStoreVgprsMFMA(ComputeStoreVgprs):
             module.add(VMulLOU32(dst=vgpr(writer.vgprs.cinRowPtr), src0=vgpr(tid1), src1=sgpr(strideC1), comment=" offset 1"))
             module.add(VMulLOU32(dst=vgpr(writer.vgprs.coutRowPtrD), src0=vgpr(tid1), src1=sgpr(strideD1), comment=" offset 1"))
             if kernel["ProblemType"]["UseE"] and (kernel["GlobalSplitU"] == 1):
-                module.add(VMovB32(dst=vgpr(writer.vgprs.coutRowPtrE), src=vgpr(tid1), comment=" save offset 1 for E"))
+                if writer.states.numStoreSgprToLoad: # Wait for kernel args
+                    lgkwait = writer.states.numStoreSgprInst - 1
+                    module.add(SWaitCnt(lgkmcnt=lgkwait, comment="wait for 1 s_load."))
+                strideE1 = "StrideE%s" % (writer.states.indexChars[packedC1[0]])
+                module.add(VMulLOU32(dst=vgpr(writer.vgprs.coutRowPtrE), src0=vgpr(tid1), src1=sgpr(strideE1), comment=" offset 1"))
 
             # coord 0 : wave part
             module.add(vectorStaticRemainder(dummy, tmpVgpr0, wave_id, kernel["MIWaveGroup"][0], tmpVgpr1Res, tmpSgprInfo))
@@ -202,7 +206,11 @@ class ComputeStoreVgprsMFMASwap(ComputeStoreVgprs):
             module.add(VMulLOU32(dst=vgpr(writer.vgprs.cinRowPtr), src0=vgpr(tid1), src1=sgpr(strideC1), comment=" offset 1"))
             module.add(VMulLOU32(dst=vgpr(writer.vgprs.coutRowPtrD), src0=vgpr(tid1), src1=sgpr(strideD1), comment=" offset 1"))
             if kernel["ProblemType"]["UseE"] and (kernel["GlobalSplitU"] == 1):
-                module.add(VMovB32(dst=vgpr(writer.vgprs.coutRowPtrE), src=vgpr(tid1), comment=" save offset 1 for E"))
+                if writer.states.numStoreSgprToLoad: # Wait for kernel args
+                    lgkwait = writer.states.numStoreSgprInst - 1
+                    module.add(SWaitCnt(lgkmcnt=lgkwait, comment="wait for 1 s_load."))
+                strideE1 = "StrideE%s" % (writer.states.indexChars[packedC1[0]])
+                module.add(VMulLOU32(dst=vgpr(writer.vgprs.coutRowPtrE), src0=vgpr(tid1), src1=sgpr(strideE1), comment=" offset 1"))
 
             # coord 0 : wave part
             module.add(vectorStaticRemainder(dummy, tid0, wave_id, kernel["MIWaveGroup"][0], tmpVgpr1Res, tmpSgprInfo))

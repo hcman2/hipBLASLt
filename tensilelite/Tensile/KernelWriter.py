@@ -65,6 +65,7 @@ class MatrixInfo:
   startVgprValu: int             = -1
 
   numSgprStrides: int            = -1
+  numSgprOffset: int             = -1
 
 @dataclass
 class ABMatrixInfo(MatrixInfo):
@@ -1274,6 +1275,25 @@ class KernelWriter(metaclass=abc.ABCMeta):
     for i in reversed(range(kernel["ProblemType"]["NumIndicesSummation"])):
       module.add(self.graIncrements(kernel, i, tensorParametersB))
 
+    ####################################
+    # Local Write Addresses
+    ####################################
+    module.addComment2("Local Write Addresses")
+
+    # tile assignments
+    module.add(self.lwaTileAssignment(tensorParametersA))
+    module.add(self.lwaTileAssignment(tensorParametersB))
+
+    # unroll assignments
+    module.add(self.lwaUnrollAssignment(kernel, tensorParametersA))
+    module.add(self.lwaUnrollAssignment(kernel, tensorParametersB))
+
+    # first offsets
+    module.addComment1("local write addresses: first offset a")
+    module.add(self.lwaFirstOffset(kernel, tensorParametersA))
+    module.addComment1("local write addresses: first offset b")
+    module.add(self.lwaFirstOffset(kernel, tensorParametersB))
+    self.dontAppendCode = False
     self.dontAppendCode = self.dontAppendCode or forceNoTileCode
 
     ###########################################################################
@@ -1971,7 +1991,6 @@ class KernelWriter(metaclass=abc.ABCMeta):
   ##############################################################################
   def kernelBody( self, kernel, tensorParametersA, tensorParametersB ):
     expand = kernel["ExpandPointerSwap"]
-    self.dontAppendCode = False
 
     ####################################
     # Begin String
@@ -1983,49 +2002,29 @@ class KernelWriter(metaclass=abc.ABCMeta):
     fs = self.functionSignature()
     moduleKernelBody.addSignature(fs)
 
+    module = Module("body")
+    module.add(self.defineAndResources(kernel, tensorParametersA, tensorParametersB))
+
     ####################################
     # Local Read Addresses
     ####################################
-    lralwaMod = Module("local")
-    lralwaMod.addComment2("Local Read Addresses")
+    module.addComment2("Local Read Addresses")
 
     # tile assignments
-    lralwaMod.addComment1("local read addresses: tile assignments a/b")
-    lralwaMod.add(self.lraTileAssignment(kernel, tensorParametersA, tensorParametersB))
+    module.addComment1("local read addresses: tile assignments a/b")
+    module.add(self.lraTileAssignment(kernel, tensorParametersA, tensorParametersB))
 
     # final offsets
-    lralwaMod.addComment1("local read addresses: final offsets a")
-    lralwaMod.add(self.lraFinalOffset(kernel, tensorParametersA))
-    lralwaMod.addComment1("local read addresses: final offsets b")
-    lralwaMod.add(self.lraFinalOffset(kernel, tensorParametersB))
+    module.addComment1("local read addresses: final offsets a")
+    module.add(self.lraFinalOffset(kernel, tensorParametersA))
+    module.addComment1("local read addresses: final offsets b")
+    module.add(self.lraFinalOffset(kernel, tensorParametersB))
 
     # declare addresses
-    lralwaMod.addComment1("local read addresses: declare addresses a")
-    lralwaMod.add(self.lraDeclareAddresses(kernel, tensorParametersA))
-    lralwaMod.addComment1("local read addresses: declare addresses b")
-    lralwaMod.add(self.lraDeclareAddresses(kernel, tensorParametersB))
-
-    ####################################
-    # Local Write Addresses
-    ####################################
-    lralwaMod.addComment2("Local Write Addresses")
-
-    # tile assignments
-    lralwaMod.add(self.lwaTileAssignment(kernel, tensorParametersA))
-    lralwaMod.add(self.lwaTileAssignment(kernel, tensorParametersB))
-
-    # unroll assignments
-    lralwaMod.add(self.lwaUnrollAssignment(kernel, tensorParametersA))
-    lralwaMod.add(self.lwaUnrollAssignment(kernel, tensorParametersB))
-
-    # first offsets
-    lralwaMod.addComment1("local write addresses: first offset a")
-    lralwaMod.add(self.lwaFirstOffset(kernel, tensorParametersA))
-    lralwaMod.addComment1("local write addresses: first offset b")
-    lralwaMod.add(self.lwaFirstOffset(kernel, tensorParametersB))
-
-    module = Module("body")
-    module.add(self.defineAndResources(kernel, tensorParametersA, tensorParametersB, lralwaMod))
+    module.addComment1("local read addresses: declare addresses a")
+    module.add(self.lraDeclareAddresses(kernel, tensorParametersA))
+    module.addComment1("local read addresses: declare addresses b")
+    module.add(self.lraDeclareAddresses(kernel, tensorParametersB))
 
     module.add(self.setupNewTile(kernel, tensorParametersA, tensorParametersB, isOptNLL=False))
 
@@ -2426,6 +2425,9 @@ class KernelWriter(metaclass=abc.ABCMeta):
       ####################################
       # NOT LocalSplitU
       ####################################
+
+      if kernel["ProblemType"]["B2BGemm"]:
+        module.add(self.b2bgemm(kernel, tensorParametersA, tensorParametersB))
 
       # global write indices
       module.addComment1("not-LocalSplitU: global write indices")
@@ -3227,6 +3229,11 @@ class KernelWriter(metaclass=abc.ABCMeta):
       self.states.b.numSgprStrides -= 1
     self.states.numSgprSizesSum = kernel["ProblemType"]["NumIndicesSummation"]
     self.states.numSgprSizesFree = kernel["ProblemType"]["NumIndicesC"]
+    self.states.e.numSgprOffset = 1
+    self.states.d.numSgprOffset = 1
+    self.states.c.numSgprOffset = 1
+    self.states.a.numSgprOffset = 1
+    self.states.b.numSgprOffset = 1
     self.states.numActivationTypeArgSize = 0 # Will change to 1 if activationType == All
     self.states.numActivationArgSize = max(1, int(kernel["ProblemType"]["DestDataType"].numRegisters()))
     self.states.numactivationArgTotalSize = self.states.numActivationArgSize * kernel["ProblemType"]["ActivationType"].getAdditionalArgNum()
@@ -3305,7 +3312,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
       self.defineSgpr("SrdScaleD", 4, 4)# asm input interface
     ###################################
     # Get kernel argument start here
-    self.defineSgpr("AddressD", numSgprAddressD,4)
+    self.defineSgpr("Tensor2dSizeA", 2,4)
     # fill empty Sgpr slot caused by Sgpr alignment,
     # because we need following defineSgpr use continuous sgpr
     SgprSlot = []
@@ -3316,7 +3323,9 @@ class KernelWriter(metaclass=abc.ABCMeta):
         self.sgprPool.checkIn(tempSgpr)
         break
       SgprSlot.append(tempSgpr)
+    self.defineSgpr("Tensor2dSizeB", 2, 2)
 
+    self.defineSgpr("AddressD", numSgprAddressD)
     self.defineSgpr("AddressC", numSgprAddressC)
     self.defineSgpr("AddressA", numSgprAddressA)
     self.defineSgpr("AddressB", numSgprAddressB)
@@ -3355,22 +3364,27 @@ class KernelWriter(metaclass=abc.ABCMeta):
     # Mostly impacts flat kernels and GSU edge since these need SGPR
     # for conditionals
     self.states.lastPostLoopSgpr = self.sgprPool.size()
-    if kernel["WorkGroupMapping"] > 1:
-      self.defineSgpr("NumFullBlocks", 1) # Magic number to use for div by (NumWorkGroups1 % WGM)
-      self.defineSgpr("WgmRemainder1", 1) # Magic number to use for div by (NumWorkGroups1 % WGM)
-      self.defineSgpr("MagicNumberWgmRemainder1", 1) # Magic number to use for div by (NumWorkGroups1 % WGM)
+    self.defineSgpr("NumFullBlocks", 1) # Magic number to use for div by (NumWorkGroups1 % WGM)
+    self.defineSgpr("WgmRemainder1", 1) # Magic number to use for div by (NumWorkGroups1 % WGM)
+    self.defineSgpr("MagicNumberWgmRemainder1", 1) # Magic number to use for div by (NumWorkGroups1 % WGM)
+
+    self.defineSgpr("OffsetD", self.states.d.numSgprOffset)
+    self.defineSgpr("OffsetC", self.states.c.numSgprOffset)
+    self.defineSgpr("OffsetA", self.states.a.numSgprOffset)
+    self.defineSgpr("OffsetB", self.states.b.numSgprOffset)
 
     if kernel["ProblemType"]["GroupedGemm"]:
       self.defineSgpr("SmallMagicNumberDivWg0", 1)
       self.defineSgpr("SmallMagicNumberDivWg01", 1)
 
-    self.states.numSgprToLoad = numSgprAddressD + numSgprAddressC + numSgprAddressA + numSgprAddressB + numSgprAddressScaleD + numSgprAlpha + \
+    self.states.numSgprToLoad = 2 + 2 + numSgprAddressD + numSgprAddressC + numSgprAddressA + numSgprAddressB + numSgprAddressScaleD + numSgprAlpha + \
       (numSgprBeta if kernel["ProblemType"]["UseBeta"] else 0) + self.states.d.numSgprStrides + self.states.c.numSgprStrides + self.states.a.numSgprStrides + \
       self.states.b.numSgprStrides + self.states.numSgprSizesFree + self.states.numSgprSizesSum + \
       len(kernel["PackedC0IdxChars"][:-1])*2 + len(kernel["PackedC1IdxChars"][:-1])*2 + \
       1 + \
       2 + \
-      (3 if kernel["WorkGroupMapping"] > 1 else 1) + \
+      3 + \
+      self.states.d.numSgprOffset + self.states.c.numSgprOffset + self.states.a.numSgprOffset + self.states.b.numSgprOffset + \
       (2 if kernel["ProblemType"]["GroupedGemm"] else 0)
     # Get kernel argument end here
     ###################################
@@ -3480,7 +3494,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
   # Allocate Resources
   ##############################################################################
   @abc.abstractmethod
-  def defineAndResources(self, kernel, tPA, tPB, lralwaCode):
+  def defineAndResources(self, kernel, tPA, tPB):
     return ""
 
   ##############################################################################
@@ -3622,7 +3636,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
   # Local Write Addresses: Tile Assignment A/B
   ##############################################################################
   @abc.abstractmethod
-  def lwaTileAssignment(self, kernel, tP):
+  def lwaTileAssignment(self, tP):
     return ""
 
   ##############################################################################

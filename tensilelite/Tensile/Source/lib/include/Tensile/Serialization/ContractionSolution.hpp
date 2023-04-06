@@ -124,6 +124,7 @@ namespace Tensile
                 iot::mapOptional(io, "useInitialStridesCD", s.useInitialStridesCD);
                 iot::mapOptional(io, "stridedBatched", s.stridedBatched);
                 iot::mapOptional(io, "groupedGemm", s.groupedGemm);
+                iot::mapOptional(io, "b2bGemm", s.b2bGemm);
                 iot::mapOptional(io, "fp16AltImpl", s.fp16AltImpl);
                 iot::mapOptional(io, "activationType", s.activationType);
                 iot::mapOptional(io, "activationHPA", s.activationHPA);

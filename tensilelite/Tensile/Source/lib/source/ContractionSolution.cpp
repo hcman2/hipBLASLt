@@ -256,8 +256,22 @@ namespace Tensile
                                              uint32_t const&  problemNumGroupTiles0,
                                              uint32_t const&  problemNumGroupTiles1,
                                              bool const&      isGrouped,
+                                             bool const&      isB2BGemm,
                                              KernelArguments& args) const
     {
+
+        if(isB2BGemm)
+        {
+            TensorDescriptor const& b = problem.b();
+            uint64_t tensor2dSizeB = b.totalAllocatedElements();
+            args.append<uint64_t>("tensor2dSizeB1", tensor2dSizeB);
+            size_t startStrideAB = problemType.useInitialStridesAB ? 0 : 1;
+            for(size_t i = startStrideAB; i < b.dimensions(); i++)
+                args.append<uint32_t>(concatenate_if<T_Debug>("strideB1", i), b.strides()[i]);
+            args.append<void const*>("B1", inputs.b);
+            return;
+        }
+
         if(debugKernel)
         {
             args.appendUnbound<unsigned int*>("debugBuffer");
@@ -268,6 +282,18 @@ namespace Tensile
         TensorDescriptor const& c = problem.c();
         TensorDescriptor const& d = problem.d();
         TensorDescriptor const& e = problem.tensor(ContractionProblemGemm::TENSOR::E);
+
+        uint64_t tensor2dSizeC = c.totalAllocatedElements();
+        uint64_t tensor2dSizeA = (sizeMapping.packBatchDims & 0x1)
+                                     ? a.totalAllocatedElements()
+                                     : problem.allocatedElementsNonBatchA();
+        uint64_t tensor2dSizeB = (sizeMapping.packBatchDims & 0x2)
+                                     ? b.totalAllocatedElements()
+                                     : problem.allocatedElementsNonBatchB();
+
+        args.append<uint64_t>("tensor2dSizeC", tensor2dSizeC);
+        args.append<uint64_t>("tensor2dSizeA", tensor2dSizeA);
+        args.append<uint64_t>("tensor2dSizeB", tensor2dSizeB);
 
         if(sizeMapping.globalAccumulation)
         {
@@ -364,19 +390,23 @@ namespace Tensile
         uint32_t wgmRemainder1            = 0;
         uint32_t magicNumberWgmRemainder1 = 0;
 
-        if(sizeMapping.workGroupMapping > 1)
+        if(sizeMapping.workGroupMapping != 0)
         {
             numFullBlocks = problemNumGroupTiles1 / sizeMapping.workGroupMapping;
             wgmRemainder1 = problemNumGroupTiles1 % sizeMapping.workGroupMapping;
             if(wgmRemainder1 == 0)
                 wgmRemainder1 = sizeMapping.workGroupMapping;
             magicNumberWgmRemainder1 = smallMagicNumber(wgmRemainder1);
-            args.append<uint32_t>("numFullBlocks", numFullBlocks);
-            args.append<uint32_t>("wgmRemainder1", wgmRemainder1);
-            args.append<uint32_t>("magicNumberWgmRemainder1", magicNumberWgmRemainder1);
         }
-        else
-            args.append<uint32_t>("pad0", 0);
+
+        args.append<uint32_t>("numFullBlocks", numFullBlocks);
+        args.append<uint32_t>("wgmRemainder1", wgmRemainder1);
+        args.append<uint32_t>("magicNumberWgmRemainder1", magicNumberWgmRemainder1);
+
+        args.append<uint32_t>("offsetD", d.offset());
+        args.append<uint32_t>("offsetC", c.offset());
+        args.append<uint32_t>("offsetA", a.offset());
+        args.append<uint32_t>("offsetB", b.offset());
 
         if(isGrouped)
         {
@@ -451,6 +481,7 @@ namespace Tensile
                                       static_cast<uint32_t>(problem.activationEnumArg()));
             }
         }
+
     }
 
     template <bool T_Debug>
@@ -517,7 +548,7 @@ namespace Tensile
         rv.sharedMemBytes = 0;
 
         singleCallArgs<T_Debug>(
-            problem, inputs, problemNumGroupTiles0, problemNumGroupTiles1, false, rv.args);
+            problem, inputs, problemNumGroupTiles0, problemNumGroupTiles1, false, false, rv.args);
 
         rv.codeObjectFile = codeObjectFilename.load();
 
@@ -602,6 +633,7 @@ namespace Tensile
                                     problemNumGroupTiles0,
                                     problemNumGroupTiles1,
                                     true,
+                                    false,
                                     args);
         }
 
@@ -618,6 +650,95 @@ namespace Tensile
         HIP_CHECK_EXC(hipMemcpy(
             d_args, h_args.data(), h_args.size() * sizeof(uint8_t), hipMemcpyHostToDevice));
         rv.args.append<uint8_t const*>("args", d_args);
+        rv.codeObjectFile = codeObjectFilename.load();
+
+        return rv;
+    }
+
+	template <bool T_Debug>
+    KernelInvocation ContractionSolution::generateSingleCallB2BGemm(
+        std::vector<ContractionSolution::Problem> const& problems,
+        ContractionSolution::GroupedInputs const&        inputs,
+        Hardware const&                                  hardware) const
+    {
+        TENSILE_ASSERT_EXC(sizeMapping.workGroupMapping >= 0);
+
+        KernelInvocation rv;
+
+        rv.args = KernelArguments(T_Debug);
+
+        rv.args.reserve(1024, 128);
+
+        rv.kernelName = kernelName;
+
+        rv.workGroupSize.x = sizeMapping.workGroupSize.x * sizeMapping.workGroupSize.y
+                             * sizeMapping.workGroupSize.z;
+        rv.workGroupSize.y = 1;
+        rv.workGroupSize.z = 1;
+
+        rv.numWorkGroups.x = 1;
+        rv.numWorkGroups.y = 1;
+
+        uint32_t problemNumGroupTiles0 = rv.numWorkGroups.x;
+        uint32_t problemNumGroupTiles1 = rv.numWorkGroups.y;
+
+        for(int idx = 0; idx < problems.size(); idx++)
+        {
+                
+            auto problem = problems[idx];
+            if(idx == 0)
+            {
+                for(size_t i = 0; i < problem.freeIndicesA().size(); i++)
+                {
+                    rv.numWorkGroups.x *= problem.freeSizeA(i);
+                }
+                for(size_t i = 0; i < problem.freeIndicesB().size(); i++)
+                {
+                    rv.numWorkGroups.y *= problem.freeSizeB(i);
+                }
+
+                rv.numWorkGroups.z = 1;
+                for(size_t i = 0; i < problem.batchIndices().size(); i++)
+                {
+                    if(sizeMapping.packBatchDims & 0x1)
+                        rv.numWorkGroups.x *= problem.batchSize(i);
+                    if(sizeMapping.packBatchDims & 0x2)
+                        rv.numWorkGroups.y *= problem.batchSize(i);
+                    if(!sizeMapping.packBatchDims)
+                        rv.numWorkGroups.z *= problem.batchSize(i);
+                }
+
+                if(problem.transposeC01())
+                    std::swap(rv.numWorkGroups.x, rv.numWorkGroups.y);
+
+                rv.numWorkGroups.x = CeilDivide(rv.numWorkGroups.x, sizeMapping.macroTile.x);
+                rv.numWorkGroups.y = CeilDivide(rv.numWorkGroups.y, sizeMapping.macroTile.y);
+
+                problemNumGroupTiles0 = rv.numWorkGroups.x;
+                problemNumGroupTiles1 = rv.numWorkGroups.y;
+                // used only when persistent kernel along batch
+                // uint32_t problemNumGroupTiles2 = rv.numWorkGroups.z;
+
+                rv.numWorkGroups.y *= sizeMapping.globalSplitU;
+
+                rv.numWorkItems.x = rv.workGroupSize.x * rv.numWorkGroups.x;
+                rv.numWorkItems.y = rv.workGroupSize.y * rv.numWorkGroups.y;
+                rv.numWorkItems.z = rv.workGroupSize.z * rv.numWorkGroups.z;
+
+                rv.sharedMemBytes = 0;
+
+                singleCallArgs<T_Debug>(
+                    problem, inputs.grouped[0], problemNumGroupTiles0, problemNumGroupTiles1, false, false, rv.args);
+            }
+            else if(idx == 1)
+            {
+                singleCallArgs<T_Debug>(
+                    problem, inputs.grouped[1], problemNumGroupTiles0, problemNumGroupTiles1, false, true, rv.args);
+            }
+            
+        }
+        
+
         rv.codeObjectFile = codeObjectFilename.load();
 
         return rv;
@@ -710,6 +831,9 @@ namespace Tensile
             idx++;
         }
 
+        rv.args.append<uint32_t>("offsetD", d.offset());
+        rv.args.append<uint32_t>("offsetC", c.offset());
+
         rv.args.append("beta", inputs.beta, problem.betaType());
 
         //Pass along code object dependency
@@ -728,6 +852,10 @@ namespace Tensile
         if(problemType.groupedGemm)
         {
             name += "_GG";
+        }
+        else if(problemType.b2bGemm)
+        {
+            name += "_B2BG";
         }
         else if(!problemType.stridedBatched)
         {
@@ -876,6 +1004,9 @@ namespace Tensile
             idx++;
         }
 
+        rv.args.append<uint32_t>("offsetD", d.offset());
+        rv.args.append<uint32_t>("offsetC", c.offset());
+
         if(sizeMapping.globalAccumulation == 1)
             rv.args.append<uint32_t>("gsu", 1);
         else
@@ -897,6 +1028,10 @@ namespace Tensile
         if(problemType.groupedGemm)
         {
             name += "_GG";
+        }
+        else if(problemType.b2bGemm)
+        {
+            name += "_B2BG";
         }
         else if(!problemType.stridedBatched)
         {
@@ -1033,6 +1168,8 @@ namespace Tensile
             idx++;
         }
 
+        rv.args.append<uint32_t>("offsetD", d.offset());
+
         return rv;
     }
 
@@ -1075,6 +1212,12 @@ namespace Tensile
             auto& gemms         = groupedProblem->gemms;
             auto  groupedInputs = dynamic_cast<ContractionGroupedInputs const*>(&inputs);
             return solveGroupedGemm(gemms, (*groupedInputs), hardware);
+        }
+        else if(auto b2bProblem = dynamic_cast<ContractionProblemB2BGemm const*>(&problem))
+        {
+            auto& gemms = b2bProblem->gemms;
+            auto gemmInputs = dynamic_cast<ContractionGroupedInputs const*>(&inputs);
+            return solveB2BGemm(gemms, (*gemmInputs), hardware);
         }
         else
         {
@@ -1280,6 +1423,94 @@ namespace Tensile
             rv.push_back(generateSingleCallGroupedGemm<true>(problems, inputs, hardware));
         else
             rv.push_back(generateSingleCallGroupedGemm<false>(problems, inputs, hardware));
+
+        return rv;
+    }
+
+    std::vector<KernelInvocation> ContractionSolution::solveB2BGemm(
+        std::vector<ContractionSolution::Problem> const& problems,
+        ContractionSolution::GroupedInputs const&        inputs,
+        Hardware const&                                  hardware) const
+    {
+        if(Debug::Instance().printWinningKernelName())
+            std::cout << "Running kernel: " << this->KernelName() << std::endl;
+
+        for(int idx = 0; idx < problems.size(); idx++)
+        {
+            auto problem = problems[idx];
+
+            // retreive alpha/beta type set via setAlpha/BetaType()
+            auto alphaType = problem.alphaType();
+            auto betaType  = problem.betaType();
+            auto biasType  = problem.biasType();
+    
+            if(alphaType == DataType::None)
+            {
+                alphaType
+                    = problemType.aType == DataType::BFloat16 ? DataType::Float : problemType.dType;
+            }
+            if(betaType == DataType::None)
+            {
+                betaType = alphaType;
+            }
+            if(biasType == DataType::None)
+            {
+                biasType = problemType.dType;
+            }
+
+            int boundSize = 1;
+            for(size_t i = 0; i < problem.boundIndices().size(); i++)
+                boundSize *= problem.boundSize(i);
+
+            // Check for nullptrs if alpha is non-zero.
+            if((!CompareValue(inputs.grouped[idx].alpha, (double)0) && (boundSize != 0))
+            && ((problem.stridedBatched() && (inputs.grouped[idx].a == nullptr || inputs.grouped[idx].b == nullptr))
+                || (!problem.stridedBatched()
+                    && (inputs.grouped[idx].batchA == nullptr || inputs.grouped[idx].batchB == nullptr))))
+            {
+                std::string matrixID = inputs.grouped[idx].a == nullptr ? "A" : "B";
+                std::string msg      = std::string("Unsupported nullptr for ") + matrixID
+                                + std::string(" when (Alpha !=0) && (K != 0)\n");
+                throw std::runtime_error(msg.c_str());
+            }
+
+            // Check if alpha matches problem definition
+            if(problem.alphaRestriction() != ScalarValue::Any
+            && problem.alphaRestriction() != toScalarValueEnum(inputs.grouped[idx].alpha))
+            {
+                std::stringstream inputValue;
+                inputValue << ToString(inputs.grouped[idx].alpha);
+                std::string msg = std::string("Alpha value ") + inputValue.str()
+                                + std::string(" doesn't match that set in problem: ")
+                                + ToString(problem.alphaRestriction());
+                throw std::runtime_error(msg.c_str());
+            }
+
+            // Check if beta matches problem definition
+            if(problem.betaRestriction() != ScalarValue::Any
+            && problem.betaRestriction() != toScalarValueEnum(inputs.grouped[idx].beta))
+            {
+                std::stringstream inputValue;
+                inputValue << ToString(inputs.grouped[idx].beta);
+                std::string msg = std::string("Beta value ") + inputValue.str()
+                                + std::string(" doesn't match that set in problem: ")
+                                + ToString(problem.betaRestriction());
+                throw std::runtime_error(msg.c_str());
+            }
+
+            if(problem.cEqualsD() && inputs.grouped[idx].c != inputs.grouped[idx].d)
+                throw std::runtime_error(
+                    "ContractionProblemGemm has cEqualsD set, but pointers for c and d are not equal");
+        }
+
+        bool debug = Debug::Instance().printKernelArguments() || this->kernelArgsLog;
+
+        std::vector<KernelInvocation> rv;
+
+        if(debug)
+            rv.push_back(generateSingleCallB2BGemm<true>(problems, inputs, hardware));
+        else
+            rv.push_back(generateSingleCallB2BGemm<false>(problems, inputs, hardware));
 
         return rv;
     }

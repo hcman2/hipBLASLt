@@ -622,6 +622,280 @@ namespace Tensile
             }
         }
 
+        template <typename Inputs, typename Accumulator>
+        void ReferenceSolution<Inputs, Accumulator>::SolveCPU(
+            ContractionProblemB2BGemm const& problem,
+            ContractionGroupedInputs const&  inputs,
+            size_t                           elementsToValidate)
+        {   
+            if(problem.gemms.size() != 2)
+            {
+                throw std::runtime_error("B2B Gemm needs 2 ProblemGemm.");
+            }
+            
+            auto problem0 = problem.gemms[0];
+            auto problem1 = problem.gemms[1];
+
+            size_t validationStride = 1;
+
+            auto input0 = inputs.grouped[0];
+            auto input1 = inputs.grouped[1];
+
+            // Convert void* to pointers
+            typename Inputs::AType const* aPtr = (typename Inputs::AType const*)input0.a;
+            typename Inputs::BType const* bPtr = (typename Inputs::BType const*)input0.b;
+            typename Inputs::CType const* cPtr = (typename Inputs::CType const*)input0.c;
+            typename Inputs::DType*       dPtr = (typename Inputs::DType*)input0.d;
+            typename Inputs::AType*       d0Ptr = (typename Inputs::AType*)input0.d;
+            typename Inputs::BType const* b1Ptr = (typename Inputs::BType const*)input1.b;
+            typename Inputs::DType*       d1Ptr = (typename Inputs::DType*)input1.d;
+
+            auto const& freeIndicesA = problem0.freeIndicesA();
+            auto const& freeIndicesB = problem0.freeIndicesB();
+            auto const& batchIndices = problem0.batchIndices();
+            auto const& boundIndices = problem0.boundIndices();
+
+            auto const& a = problem0.a();
+            auto const& b = problem0.b();
+            auto const& c = problem0.c();
+            auto const& d = problem0.d();
+
+            bool aConjugate = false;
+            bool bConjugate = false;
+
+            std::vector<size_t> freeASize(freeIndicesA.size());
+            std::vector<size_t> freeBSize(freeIndicesB.size());
+            std::vector<size_t> batchSize(batchIndices.size());
+            std::vector<size_t> boundSize(boundIndices.size());
+
+            for(int i = 0; i < freeASize.size(); i++)
+                freeASize[i] = problem0.freeSizeA(i);
+            for(int i = 0; i < freeBSize.size(); i++)
+                freeBSize[i] = problem0.freeSizeB(i);
+            for(int i = 0; i < batchSize.size(); i++)
+                batchSize[i] = problem0.batchSize(i);
+            for(int i = 0; i < boundSize.size(); i++)
+            {
+                boundSize[i] = problem0.boundSize(i);
+            } 
+            
+            auto boundCount = CoordCount(boundSize.begin() + 1, boundSize.end());
+            if(std::get<typename Inputs::AlphaType>(input1.alpha)
+               != static_cast<typename Inputs::AlphaType>(0))
+            {
+                if(input0.a == nullptr || input0.b == nullptr)
+                {
+                    std::ostringstream msg;
+                    msg << "Unsupported nullptr for";
+                    if(!input0.a)
+                        msg << " A";
+                    if(!input0.b)
+                        msg << " B";
+                    msg << " when Alpha !=0";
+
+                    throw std::runtime_error(msg.str());
+                }
+            }
+#pragma omp parallel for
+            for(size_t dNum = 0; dNum < d.totalLogicalElements(); dNum += validationStride)
+            {
+                std::vector<int64_t> aCoord(a.dimensions());
+                std::vector<int64_t> bCoord(b.dimensions());
+                std::vector<int64_t> cCoord(c.dimensions());
+                std::vector<int64_t> dCoord(d.dimensions());
+
+                CoordNumbered(
+                    dNum, dCoord.begin(), dCoord.end(), d.sizes().begin(), d.sizes().end());
+
+                for(size_t i = 0; i < problem0.batchIndices().size(); i++)
+                {
+                    auto const& idx   = problem0.batchIndices()[i];
+                    size_t      coord = dCoord[idx.d];
+
+                    aCoord[idx.a] = coord;
+                    bCoord[idx.b] = coord;
+                    cCoord[idx.c] = coord;
+                }
+
+                for(size_t i = 0; i < problem0.freeIndices().size(); i++)
+                {
+                    auto const& idx   = problem0.freeIndices()[i];
+                    size_t      coord = dCoord[idx.d];
+
+                    cCoord[idx.c] = coord;
+
+                    if(idx.isA)
+                        aCoord[idx.i] = coord;
+                    else
+                        bCoord[idx.i] = coord;
+                }
+
+                Accumulator value(0);
+
+                for(size_t boundNum = 0; boundNum < boundCount; boundNum++)
+                {
+                    std::vector<int64_t> bound(problem0.boundIndices().size());
+                    CoordNumbered(boundNum,
+                                    bound.begin() + 1,
+                                    bound.end(),
+                                    boundSize.begin() + 1,
+                                    boundSize.end());
+
+                    for(int i = 1; i < bound.size(); i++)
+                    {
+                        aCoord[boundIndices[i].a] = bound[i];
+                        bCoord[boundIndices[i].b] = bound[i];
+
+                        if(problem0.boundIndices()[i].aMirror)
+                            aCoord[boundIndices[i].a]
+                                = boundSize[i] - aCoord[boundIndices[i].a] - 1;
+                        if(problem0.boundIndices()[i].bMirror)
+                            bCoord[boundIndices[i].b]
+                                = boundSize[i] - bCoord[boundIndices[i].b] - 1;
+                    }
+
+                    size_t aIndex = a.index(aCoord);
+                    size_t bIndex = b.index(bCoord);
+
+                    auto aStride = problem0.a().strides()[boundIndices[0].a];
+                    auto bStride = problem0.b().strides()[boundIndices[0].b];
+
+                    // innermost bound calculation:
+                    for(size_t i = 0; i < boundSize[0]; i++)
+                    {
+                        size_t aI
+                            = problem0.boundIndices()[0].aMirror ? (boundSize[0] - i - 1) : i;
+                        size_t bI
+                            = problem0.boundIndices()[0].bMirror ? (boundSize[0] - i - 1) : i;
+
+                        typename Inputs::AType aVal(0);
+                        typename Inputs::BType bVal(0);
+                        aVal = Transform<typename Inputs::AType>::Input(
+                            aPtr[aIndex + (aI * aStride)], aConjugate);
+                        bVal = Transform<typename Inputs::BType>::Input(
+                            bPtr[bIndex + (bI * bStride)], bConjugate);
+
+                        value += multiply<Accumulator>(aVal, bVal);
+                    }
+                }
+                auto dIndex = d.index(dCoord);
+                dPtr[dIndex] = SaturateCast<typename Inputs::DType>(value);
+            }
+
+            //2nd Gemm
+            auto const& boundIndices1 = problem1.boundIndices();
+            std::vector<size_t> boundSize1(boundIndices1.size());
+            for(int i = 0; i < boundSize1.size(); i++)
+            {
+                boundSize1[i] = problem1.boundSize(i);
+            } 
+
+            auto boundCount1 = CoordCount(boundSize1.begin() + 1, boundSize1.end());
+
+            auto const& b1 = problem1.b();
+            auto const& d1 = problem1.d();
+
+            if(elementsToValidate > 0 && elementsToValidate < problem1.d().totalLogicalElements())
+                validationStride
+                    = NextPrime(problem1.d().totalAllocatedElements() / elementsToValidate);
+
+            for(size_t dNum = 0; dNum < d1.totalLogicalElements(); dNum += validationStride)
+            {
+                std::vector<int64_t> aCoord(d.dimensions());
+                std::vector<int64_t> bCoord(b1.dimensions());
+                std::vector<int64_t> cCoord(c.dimensions());
+                std::vector<int64_t> dCoord(d1.dimensions());
+
+                CoordNumbered(
+                    dNum, dCoord.begin(), dCoord.end(), d1.sizes().begin(), d1.sizes().end());
+
+                for(size_t i = 0; i < problem1.batchIndices().size(); i++)
+                {
+                    auto const& idx   = problem1.batchIndices()[i];
+                    size_t      coord = dCoord[idx.d];
+
+                    bCoord[idx.b] = coord;
+                    cCoord[idx.c] = coord;
+                }
+
+                for(size_t i = 0; i < problem1.freeIndices().size(); i++)
+                {
+                    auto const& idx   = problem1.freeIndices()[i];
+                    size_t      coord = dCoord[idx.d];
+
+                    cCoord[idx.c] = coord;
+
+                    if(idx.isA)
+                        continue;
+                    else
+                        bCoord[idx.i] = coord;
+                }
+
+                aCoord[0] = dCoord[0];
+
+                Accumulator value(0);
+                // Check short-circuit for alpha = 0
+                if(std::get<typename Inputs::AlphaType>(inputs.grouped[1].alpha)
+                   != static_cast<typename Inputs::AlphaType>(0))
+                {
+                    for(size_t boundNum = 0; boundNum < boundCount1; boundNum++)
+                    {
+                        std::vector<int64_t> bound(problem1.boundIndices().size());
+                        CoordNumbered(boundNum,
+                                        bound.begin() + 1,
+                                        bound.end(),
+                                        boundSize1.begin() + 1,
+                                        boundSize1.end());
+
+                        for(int i = 1; i < bound.size(); i++)
+                        {
+                            aCoord[boundIndices1[i].a] = bound[i];
+                            bCoord[boundIndices1[i].b] = bound[i];
+
+                            //Skip mirror check
+                        }
+
+                        size_t aIndex = d.index(aCoord);
+                        size_t bIndex = b1.index(bCoord);
+
+                        auto aStride = problem0.d().strides()[1];
+                        auto bStride = problem1.b().strides()[boundIndices1[0].b];
+
+                        // innermost bound calculation:
+                        for(size_t i = 0; i < boundSize1[0]; i++)
+                        {
+                            size_t aI = i;
+                            size_t bI = i;
+
+                            typename Inputs::AType aVal(0);
+                            typename Inputs::BType bVal(0);
+                            //AType should be the same as DType
+                            aVal = Transform<typename Inputs::AType>::Input(
+                                d0Ptr[aIndex + (aI * aStride)], aConjugate);
+                            bVal = Transform<typename Inputs::BType>::Input(
+                                b1Ptr[bIndex + (bI * bStride)], bConjugate);
+
+                            value += multiply<Accumulator>(aVal, bVal);
+                        }
+                    }
+                }
+
+                auto cIndex = c.index(cCoord);
+                auto d1Index = d1.index(dCoord);
+
+                // Ensure zero*nan returns zero
+                Accumulator alpha = constVariantCast<Accumulator>(inputs.grouped[1].alpha);
+                Accumulator beta  = constVariantCast<Accumulator>(inputs.grouped[1].beta);
+                auto        zero  = static_cast<Accumulator>(0);
+                
+                auto resultD = multiply<Accumulator>(alpha, value)
+                               + ((beta == zero) ? static_cast<Accumulator>(zero)
+                                                 : multiply<Accumulator>(beta, cPtr[cIndex]));
+
+                d1Ptr[d1Index] = SaturateCast<typename Inputs::DType>(resultD);
+            }
+        }
+
         uint32_t getInputContractionInputsTypeId(ContractionProblemGemm const& problem)
         {
             // retreive alpha/beta type set via setAlpha/BetaType()
@@ -677,6 +951,10 @@ namespace Tensile
                 isHPA = problem.highPrecisionAccumulate();
             }
             else if constexpr(std::is_same<ContractionProblemGroupedGemm, Problem>::value)
+            {
+                isHPA = problem.gemms[0].highPrecisionAccumulate();
+            }
+            else if constexpr(std::is_same<ContractionProblemB2BGemm, Problem>::value)
             {
                 isHPA = problem.gemms[0].highPrecisionAccumulate();
             }
@@ -797,6 +1075,17 @@ namespace Tensile
                         = getInputContractionInputsTypeId(groupedProblem->gemms[0]);
                     SolveCPUTemplates(
                         contractionInputsTypeId, *groupedProblem, *refInput, elementsToValidate);
+                }
+                else
+                    throw std::runtime_error("Unable to cast input to ContractionGroupedInputs.");
+            }
+            else if(auto b2bProblem = dynamic_cast<ContractionProblemB2BGemm const*>(problem))
+            {
+                if(auto refInput = dynamic_cast<ContractionGroupedInputs const*>(inputs))
+                {
+                    auto contractionInputsTypeId = getInputContractionInputsTypeId(b2bProblem->gemms[0]);
+                    SolveCPUTemplates(
+                        contractionInputsTypeId, *b2bProblem, *refInput, elementsToValidate);
                 }
                 else
                     throw std::runtime_error("Unable to cast input to ContractionGroupedInputs.");

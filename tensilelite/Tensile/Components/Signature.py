@@ -73,6 +73,9 @@ class SignatureCOV3(Signature):
 
         if globalParameters["DebugKernel"]:
             signature.addArg("AddressDbg", SVK.SIG_GLOBALBUFFER, "struct", "generic")
+        signature.addArg("sizeC",        SVK.SIG_VALUE,        "u64")
+        signature.addArg("sizeA",        SVK.SIG_VALUE,        "u64")
+        signature.addArg("sizeB",        SVK.SIG_VALUE,        "u64")
         signature.addArg(    "D", SVK.SIG_GLOBALBUFFER, dstValueType, "generic")
         signature.addArg(    "C", SVK.SIG_GLOBALBUFFER, dstValueType, "generic")
         signature.addArg(    "A", SVK.SIG_GLOBALBUFFER, srcValueType, "generic")
@@ -113,12 +116,14 @@ class SignatureCOV3(Signature):
         signature.addArg(               "NumWorkGroups0", SVK.SIG_VALUE,              "u32")
         signature.addArg(               "NumWorkGroups1", SVK.SIG_VALUE,              "u32")
 
-        if kernel["WorkGroupMapping"] > 1:
-            signature.addArg(                "NumFullBlocks", SVK.SIG_VALUE,              "u32")
-            signature.addArg(                "WgmRemainder1", SVK.SIG_VALUE,              "u32")
-            signature.addArg(     "MagicNumberWgmRemainder1", SVK.SIG_VALUE,              "u32")
-        else:
-            signature.addArg(                      "padding", SVK.SIG_VALUE,              "u32")
+        signature.addArg(                "NumFullBlocks", SVK.SIG_VALUE,              "u32")
+        signature.addArg(                "WgmRemainder1", SVK.SIG_VALUE,              "u32")
+        signature.addArg(     "MagicNumberWgmRemainder1", SVK.SIG_VALUE,              "u32")
+
+        signature.addArg(                      "OffsetD", SVK.SIG_VALUE,              "u32")
+        signature.addArg(                      "OffsetC", SVK.SIG_VALUE,              "u32")
+        signature.addArg(                      "OffsetA", SVK.SIG_VALUE,              "u32")
+        signature.addArg(                      "OffsetB", SVK.SIG_VALUE,              "u32")
 
         if kernel["ProblemType"]["UseBias"] and (kernel["GlobalSplitU"] == 1):
             signature.addArg("bias", SVK.SIG_GLOBALBUFFER, biasValueType, "generic")
@@ -142,6 +147,12 @@ class SignatureCOV3(Signature):
                 signature.addArg(                   name, SVK.SIG_VALUE,        actValueType)
             if kernel["ProblemType"]["ActivationType"] == 'all':
                 signature.addArg(       "activationType", SVK.SIG_VALUE,               "u32")
+
+        if kernel["ProblemType"]["B2BGemm"]:
+            signature.addArg("sizeB1", SVK.SIG_VALUE, "u64")
+            signature.addArg("strideB10", SVK.SIG_VALUE, "u32")
+            signature.addArg("strideB11", SVK.SIG_VALUE, "u32")
+            signature.addArg("B1", SVK.SIG_GLOBALBUFFER, "generic")
 
         self.addOptConfigComment(signature,
                                 tt=[kernel["ThreadTile0"], kernel["ThreadTile1"]],

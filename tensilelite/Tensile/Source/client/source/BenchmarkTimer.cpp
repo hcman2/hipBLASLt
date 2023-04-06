@@ -88,6 +88,10 @@ namespace Tensile
             {
                 pp = solution.projectedPerformance(problem->gemms[0], m_hardware);
             }
+            else if(auto problem = dynamic_cast<ContractionProblemB2BGemm*>(m_problem))
+            {
+                pp = solution.projectedPerformance(problem->gemms[0], m_hardware);
+            }
             else if(auto problem = dynamic_cast<ContractionProblemGemm*>(m_problem))
             {
                 pp = solution.projectedPerformance(*problem, m_hardware);
@@ -120,6 +124,11 @@ namespace Tensile
             ContractionSolution::ProjectedPerformance pp;
             double                                    flopCount = 0;
             if(auto problem = dynamic_cast<ContractionProblemGroupedGemm*>(m_problem))
+            {
+                pp        = m_solution.projectedPerformance(problem->gemms[0], m_hardware);
+                flopCount = problem->gemms[0].flopCount();
+            }
+            else if(auto problem = dynamic_cast<ContractionProblemB2BGemm*>(m_problem))
             {
                 pp        = m_solution.projectedPerformance(problem->gemms[0], m_hardware);
                 flopCount = problem->gemms[0].flopCount();
@@ -201,6 +210,12 @@ namespace Tensile
                 {
                     flopCount = problem->gemms[0].flopCount();
                 }
+                else if(auto problem = dynamic_cast<ContractionProblemB2BGemm*>(m_problem))
+                {
+                    double flopCount0 = problem->gemms[0].flopCount();
+                    double flopCount1 = problem->gemms[1].flopCount();
+                    flopCount = flopCount0 + flopCount1;
+                }
                 else if(auto problem = dynamic_cast<ContractionProblemGemm*>(m_problem))
                 {
                     flopCount = problem->flopCount();
@@ -223,34 +238,22 @@ namespace Tensile
             m_curNumEnqueuesPerSync = count;
         }
 
-        void BenchmarkTimer::preEnqueues(hipStream_t const& stream)
+        void BenchmarkTimer::preEnqueues()
         {
             if(!m_useGPUTimer)
             {
                 HIP_CHECK_EXC(hipDeviceSynchronize());
                 m_startTime = clock::now();
             }
-            else
-            {
-                hipEventCreate(&start);
-                hipEventCreate(&stop);
-                hipEventRecord(start, stream);
-            }
         }
 
         void BenchmarkTimer::postEnqueues(TimingEvents const& startEvents,
-                                          TimingEvents const& stopEvents,
-                                          hipStream_t const&  stream)
+                                          TimingEvents const& stopEvents)
         {
             if(!m_useGPUTimer)
             {
                 HIP_CHECK_EXC(hipDeviceSynchronize());
                 m_endTime = clock::now();
-            }
-            else
-            {
-                hipEventRecord(stop, stream);
-                hipEventSynchronize(stop);
             }
         }
 
@@ -262,25 +265,15 @@ namespace Tensile
 
             if(m_useGPUTimer)
             {
-                if((start == nullptr) && (stop == nullptr))
+                HIP_CHECK_EXC(hipEventSynchronize(stopEvents->back().back()));
+                for(size_t i = 0; i < startEvents->size(); i++)
                 {
                     float enqTime = 0.0f;
-                    HIP_CHECK_EXC(hipEventSynchronize(stopEvents->back().back()));
-                    for(size_t i = 0; i < startEvents->size(); i++)
-                    {
-                        HIP_CHECK_EXC(hipEventElapsedTime(
-                            &enqTime, startEvents->at(i).front(), stopEvents->at(i).back()));
 
-                        totalTime += double_millis(enqTime);
-                    }
-                }
-                else
-                {
-                    float eventMs = 0.0f;
-                    hipEventElapsedTime(&eventMs, start, stop);
-                    totalTime = double_millis(eventMs);
-                    hipEventDestroy(start);
-                    hipEventDestroy(stop);
+                    HIP_CHECK_EXC(hipEventElapsedTime(
+                        &enqTime, startEvents->at(i).front(), stopEvents->at(i).back()));
+
+                    totalTime += double_millis(enqTime);
                 }
             }
             else

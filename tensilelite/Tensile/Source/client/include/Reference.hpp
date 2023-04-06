@@ -55,6 +55,10 @@ namespace Tensile
                 return a == b;
             }
             Half absDiff = (a - b > 0) ? a - b : b - a;
+            if((absDiff / (absA + absB + 1) < 0.01) == false)
+            {
+                //std::cout<<"[MonTest] Error: We need error to be "<<absDiff / (absA + absB + 1)<<std::endl;
+            }
             return absDiff / (absA + absB + 1) < 0.01;
         }
 
@@ -117,6 +121,9 @@ namespace Tensile
             static void SolveCPU(ContractionProblemGroupedGemm const& contractions,
                                  ContractionGroupedInputs const&      inputs,
                                  size_t                               elementsToValidate);
+            static void SolveCPU(ContractionProblemB2BGemm const& contractions,
+                                 ContractionGroupedInputs const&  inputs,
+                                 size_t                           elementsToValidate);
         };
 
         void SolveCPU(ContractionProblem const* contraction,

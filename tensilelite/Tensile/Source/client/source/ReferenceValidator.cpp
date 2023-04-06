@@ -132,6 +132,18 @@ namespace Tensile
                         rv &= validate(problems->gemms[j], reference.grouped[j], result.grouped[j]);
                     }
                 }
+                else if(auto problems = dynamic_cast<ContractionProblemB2BGemm*>(m_problem))
+                {
+                    auto reference
+                        = dynamic_cast<ContractionGroupedInputs const&>(*m_referenceInputs);
+                    auto result = dynamic_cast<ContractionGroupedInputs const&>(*inputs);
+                    rv          = true;
+                
+                    //validate 2nd GEMM only
+                    rv &= validate(problems->gemms[0], reference.grouped[1], result.grouped[0]);
+
+                    return rv;
+                }
                 else if(auto problem = dynamic_cast<ContractionProblemGemm*>(m_problem))
                 {
                     auto reference = dynamic_cast<ContractionInputs const&>(*m_referenceInputs);
@@ -341,7 +353,7 @@ namespace Tensile
                     std::cout << "Validating tensor " << tensor.getName() << ", cpu pointer "
                               << refPtr << ", gpu pointer " << resPtr
                               << ", size = " << result.maxElements[i] << std::endl;
-
+                
                 rv &= checkResults(
                     tensor, refPtr, resPtr, result.maxElements[i], result.gpu, validationStride);
             }
@@ -573,7 +585,6 @@ namespace Tensile
             if(boundsCheckElements > 0)
                 std::cout << "Performed bounds check on " << boundsCheckElements << " elements ("
                           << elementsBeforeData << " before data)" << std::endl;
-
             compareValid.report();
             compareInvalid.report();
 

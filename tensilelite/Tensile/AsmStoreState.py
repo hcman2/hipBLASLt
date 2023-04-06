@@ -232,14 +232,15 @@ class StoreState:
         self.numVgprsPerElement = self.cfg.numVgprPerValuC*gwvw + self.cfg.numVgprsPerAddr + int(ceil(self.cfg.numVgprsPerDataPerVI * gwvw))
         if kernel["GroupLoadStore"] and kernel["ProblemType"]["UseBeta"]:
             self.numVgprsPerElement += self.cfg.numVgprsPerAddr
-        if kernel["ProblemType"]["UseE"] and (kernel["GlobalSplitU"] == 1):
-            self.numVgprsPerElement += self.cfg.numVgprsPerAddr  # E address
+        # Only needed in gradient activation
+        # if kernel["ProblemType"]["UseE"] and (kernel["GlobalSplitU"] == 1):
+        #     self.numVgprsPerElement += self.cfg.numVgprsPerAddr  # E address
         if kernel["ProblemType"]["UseBias"] and (kernel["GlobalSplitU"] == 1):
             self.numVgprsPerElement += self.cfg.numVgprsPerAddr  # Bias address
             numVgprs = int(ceil(kernel["ProblemType"]["ComputeDataType"].numRegisters()))
             self.numVgprsPerElement += numVgprs * gwvw  # Loaded data
 
-        if kernel["ProblemType"]["UseScaleD"] and (kernel["GlobalSplitU"] == 1):
+        if kernel["ProblemType"]["UseScaleD"]:
             self.numVgprsPerElement += self.cfg.numVgprsPerAddr  # ScaleD address
             numVgprs = int(ceil(kernel["ProblemType"]["DataType"].numRegisters()))
             self.numVgprsPerElement += numVgprs * gwvw  # Loaded data
@@ -438,7 +439,7 @@ class StoreState:
 
             self.elementData.append(data)
 
-            if kernel["ProblemType"]["UseBias"] and (kernel["GlobalSplitU"] == 1):
+            if kernel["ProblemType"]["UseBias"]:
                 if coordOffset0 in biasVgprMap:
                     dataBias = biasVgprMap[coordOffset0]
                 else:
@@ -460,7 +461,7 @@ class StoreState:
             dataE = 0
             self.elementDataE.append(dataE)
 
-            if kernel["ProblemType"]["UseScaleD"] and (kernel["GlobalSplitU"] == 1):
+            if kernel["ProblemType"]["UseScaleD"]:
                 if coordOffset0 in scaleDVgprMap:
                     dataScaleD = scaleDVgprMap[coordOffset0]
                 else:

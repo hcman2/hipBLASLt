@@ -485,6 +485,7 @@ def writeClientConfigIni(problemSizes, biasTypeArgs, activationArgs, problemType
         param('high-precision-accumulate', problemType.highPrecisionAccumulate)
         param('strided-batched', problemType.stridedBatched)
         param('grouped-gemm', problemType.groupedGemm)
+        param('b2b-gemm', problemType.b2bGemm)
 
         for problem in problemSizes.problems:
             for key,value in problemSizeParams(problemType, problem):
@@ -504,6 +505,12 @@ def writeClientConfigIni(problemSizes, biasTypeArgs, activationArgs, problemType
             param(key, value)
 
         param("c-equal-d",                globalParameters["CEqualD"])
+
+        param("offset-a",                 globalParameters["BufferOffsetA"])
+        param("offset-b",                 globalParameters["BufferOffsetB"])
+        param("offset-c",                 globalParameters["BufferOffsetC"])
+        param("offset-d",                 globalParameters["BufferOffsetD"])
+        param("offset-e",                 globalParameters["BufferOffsetE"])
 
         if globalParameters["PrintTensorA"]:
           param("print-tensor-a",         1)

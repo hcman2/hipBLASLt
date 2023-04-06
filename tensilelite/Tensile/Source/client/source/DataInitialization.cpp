@@ -375,6 +375,22 @@ namespace Tensile
                     m_vdata.resize(grouped.gemms[0].tensors().size());
                     m_cdata.resize(grouped.gemms[0].constants().size());
                 }
+                else if(auto ptr = dynamic_cast<ContractionProblemB2BGemm const*>(p.get()))
+                {
+                    const ContractionProblemB2BGemm& b2b = (*ptr);
+                    if(m_problemDependentData)
+                    {
+                        throw std::runtime_error(
+                            "Currently does not support dependent data with b2b gemm.");
+                    }
+                    if(problemFactory.problems().size() != 1)
+                    {
+                        throw std::runtime_error("Currently only supports one ContractionProblem "
+                                                 "if b2b gemm is found in the ProblemFactory.");
+                    }
+                    m_vdata.resize(b2b.gemms[0].tensors().size());
+                    m_cdata.resize(b2b.gemms[0].constants().size());
+                }
                 else
                 {
                     m_vdata.resize(problemFactory.problems()[0]->tensors().size());
@@ -524,13 +540,110 @@ namespace Tensile
                         }
                     }
                 }
+                else if(auto ptr = dynamic_cast<ContractionProblemB2BGemm const*>(p.get()))
+                {
+                    const ContractionProblemB2BGemm& problems = (*ptr);
+
+                    struct gElement
+                    {
+                        size_t              maxElements;
+                        std::vector<size_t> offsets;
+                    };
+
+                    auto gElements = std::vector<std::map<DataType, gElement>>(m_vdata.size());
+                    for(auto const& problem : problems.gemms)
+                    {
+                        for(size_t i = 0; i < problem.tensors().size(); i++)
+                        {
+                            auto dataType = problem.tensors()[i].dataType();
+
+                            if(m_vdata[i].pristine.find(dataType) == m_vdata[i].pristine.end())
+                            {
+                                m_vdata[i].pristine[dataType]             = PristineUnit();
+                                m_vdata[i].pristine[dataType].maxElements = 0;
+                            }
+                            if(gElements[i].find(dataType) == gElements[i].end())
+                            {
+                                gElements[i][dataType].maxElements = 0;
+                            }
+                            auto& pristine = m_vdata[i].pristine[dataType];
+                            gElements[i][dataType].maxElements
+                                += problem.tensors()[i].totalAllocatedElements();
+                            gElements[i][dataType].offsets.push_back(
+                                problem.tensors()[i].totalAllocatedElements());
+
+                            if(m_vdata[i].name.empty())
+                            {
+                                m_vdata[i].name = problem.tensors()[i].getName();
+                            }
+                            else if(m_vdata[i].name != problem.tensors()[i].getName())
+                            {
+                                std::string s = "Input tensor name "
+                                                + problem.tensors()[i].getName()
+                                                + " not match the pristine name " + m_vdata[i].name
+                                                + " at index " + std::to_string(i) + ".";
+                                throw std::runtime_error(s.c_str());
+                            }
+                        }
+                        auto constants = problem.constants();
+                        for(size_t i = 0; i < constants.size(); i++)
+                        {
+                            if(m_cdata[i].name.empty())
+                            {
+                                m_cdata[i].name = constants[i].name;
+                            }
+                            else if(m_cdata[i].name != constants[i].name)
+                            {
+                                std::string s = "Input constant name " + constants[i].name
+                                                + " not match the pristine name " + m_cdata[i].name
+                                                + " at index " + std::to_string(i) + ".";
+                                throw std::runtime_error(s.c_str());
+                            }
+                        }
+
+                        size_t numOfBatch = 1;
+                        for(size_t i = 0; i < problem.batchIndices().size(); i++)
+                            numOfBatch *= problem.batchSize(i);
+                        m_maxBatch = std::max(m_maxBatch, numOfBatch);
+                    }
+
+                    // Update maxElements
+                    for(size_t i = 0; i < gElements.size(); i++)
+                    {
+                        for(auto it : gElements[i])
+                        {
+                            auto& pristine = m_vdata[i].pristine[it.first];
+                            pristine.maxElements
+                                = std::max(pristine.maxElements, it.second.maxElements);
+
+                            if(pristine.groupedGemmOffsets.empty())
+                            {
+                                pristine.groupedGemmOffsets = it.second.offsets;
+                            }
+                            else
+                            {
+                                if(pristine.groupedGemmOffsets.size() != it.second.offsets.size())
+                                {
+                                    throw std::runtime_error(
+                                        "Unable to update groupedGemmOffsets.");
+                                }
+                                for(size_t j = 0; j < it.second.offsets.size(); j++)
+                                {
+                                    pristine.groupedGemmOffsets[j] = std::max(
+                                        pristine.groupedGemmOffsets[j], it.second.offsets[j]);
+                                }
+                            }
+                        }
+                    }
+                }
             }
 
             // Init tensors
             for(size_t i = 0; i < m_vdata.size(); i++)
             {
-                std::string initName = "init-" + m_vdata[i].name;
-                std::string typeName = m_vdata[i].name + "-type";
+                std::string initName   = "init-" + m_vdata[i].name;
+                std::string offsetName = "offset-" + m_vdata[i].name;
+                std::string typeName   = m_vdata[i].name + "-type";
                 if(args.count(initName))
                 {
                     m_vdata[i].init = args[initName].as<InitMode>();
@@ -538,6 +651,18 @@ namespace Tensile
                 else
                 {
                     m_vdata[i].init = InitMode::Zero;
+                }
+                if(args.count(offsetName))
+                {
+                    m_vdata[i].offset = args[offsetName].as<size_t>();
+                    for(auto p : m_vdata[i].pristine)
+                    {
+                        p.second.maxElements += m_vdata[i].offset;
+                    }
+                }
+                else
+                {
+                    m_vdata[i].offset = 0;
                 }
 
                 for(auto p = m_vdata[i].pristine.begin(); p != m_vdata[i].pristine.end();)
@@ -730,7 +855,7 @@ namespace Tensile
                        << DataTypeInfo::Get(p.first).abbrev
                        << "), element size: " << DataTypeInfo::Get(p.first).elementSize
                        << ", element length: " << pUnit.maxElements;
-
+                    
                     if(!pUnit.gpuInput.current)
                     {
                         if(enableGuardPage)

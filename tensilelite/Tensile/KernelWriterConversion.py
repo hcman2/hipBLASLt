@@ -121,6 +121,10 @@ class KernelWriterConversion(KernelWriterBase):
     for i in range(0, self.state["ProblemType"]["NumIndicesC"]):
       kStr += "  unsigned int const size%s,%s" % (self.indexChars[i], self.endLine)
 
+    # offset
+    kStr += "  unsigned int offsetD,%s" % self.endLine
+    kStr += "  unsigned int offsetC,%s" % self.endLine
+
     # gsu
     kStr += "  unsigned int const gsu)%s" % self.endLine
 
@@ -246,6 +250,12 @@ class KernelWriterConversion(KernelWriterBase):
       kStr += "  " + ptrStr + f" const* C = (beta == {zeroStr}) ? nullptr : BatchC[wg];" + self.endLine
 
     ########################################
+    # apply offset
+    kStr += self.endLine
+    kStr += "  D = D + offsetD;" + self.endLine
+    kStr += "  C = C + offsetC;" + self.endLine
+
+    ########################################
     # D index
     kStr += self.endLine
     kStr += "  %s idxD = GLOBAL_D( (%s)" % (self.uint64Str, self.uint64Str)
@@ -357,6 +367,8 @@ class KernelWriterConversion(KernelWriterBase):
     name += self.state["ProblemType"]["DestDataType"].toChar()
     if self.state["ProblemType"]["GroupedGemm"]:
       name += "_GG"
+    elif self.state["ProblemType"]["B2BGemm"]:
+      name += "_B2BG"
     else:
       name += "" if self.state["ProblemType"]["StridedBatched"] else "_GB"
     name += "_Bias%s"%self.state["ProblemType"]["BiasDataType"].toChar() if self.state["ProblemType"]["UseBias"] else ""

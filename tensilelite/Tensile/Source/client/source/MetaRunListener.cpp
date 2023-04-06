@@ -86,7 +86,9 @@ namespace Tensile
         void MetaRunListener::preProblem(ContractionProblem* const problem)
         {
             for(auto iter = m_listeners.begin(); iter != m_listeners.end(); iter++)
+            {
                 (*iter)->preProblem(problem);
+            }
         }
 
         void MetaRunListener::postProblem()
@@ -110,8 +112,11 @@ namespace Tensile
         bool MetaRunListener::needMoreRunsInSolution() const
         {
             for(auto iter = m_listeners.begin(); iter != m_listeners.end(); iter++)
-                if((*iter)->needMoreRunsInSolution())
+            {
+                if((*iter)->needMoreRunsInSolution()){
                     return true;
+                }
+            } 
 
             return false;
         }
@@ -150,7 +155,10 @@ namespace Tensile
                                               TimingEvents const&            stopEvents)
         {
             for(auto iter = m_listeners.begin(); iter != m_listeners.end(); iter++)
+            {
                 (*iter)->validateWarmups(inputs, startEvents, stopEvents);
+            }
+                
         }
 
         size_t MetaRunListener::numSyncs()
@@ -199,18 +207,17 @@ namespace Tensile
                 (*iter)->setNumEnqueuesPerSync(count);
         }
 
-        void MetaRunListener::preEnqueues(hipStream_t const& stream)
+        void MetaRunListener::preEnqueues()
         {
             for(auto iter = m_listeners.begin(); iter != m_listeners.end(); iter++)
-                (*iter)->preEnqueues(stream);
+                (*iter)->preEnqueues();
         }
 
         void MetaRunListener::postEnqueues(TimingEvents const& startEvents,
-                                           TimingEvents const& stopEvents,
-                                           hipStream_t const&  stream)
+                                           TimingEvents const& stopEvents)
         {
             for(auto iter = m_listeners.rbegin(); iter != m_listeners.rend(); iter++)
-                (*iter)->postEnqueues(startEvents, stopEvents, stream);
+                (*iter)->postEnqueues(startEvents, stopEvents);
         }
 
         void MetaRunListener::validateEnqueues(std::shared_ptr<ProblemInputs> inputs,

@@ -156,7 +156,7 @@ class ProblemType(Mapping):
           (anchorDim, stride) = sc[:2]
           if anchorDim not in self.state["IndexAssignments%s"%tc]:
               printExit("SetConstStride%s=%s anchorDim=%u is not in IndexAssignments%s"%(tc, sc, anchorDim, tc))
-
+ 
     # Bias
     # If compute data type is not equal to dest data type, tensile will run conversion kernel.
     # In this case we don't need to apply bias in beta only kernel.
@@ -414,6 +414,8 @@ class ProblemType(Mapping):
     # name += "_SB" if self["StridedBatched"] else "_GB"
     if self["GroupedGemm"]:
       name += "_GG"
+    elif self["B2BGemm"]:
+      name += "_B2BG"
     else:
       name += "" if self["StridedBatched"] else "_GB" # legacy
 
@@ -1484,7 +1486,7 @@ class Solution(collections.abc.Mapping):
       state["EnableMatrixInstruction"] = True
 
       # set MIBlock
-      MIBlock_BM = miwg0 // mi[0]
+      MIBlock_BM = mi[4]
       MIBlock_BM = min(MIBlock_BM, mi[3])
       MIBlock_BN = mi[3] // MIBlock_BM
 
@@ -2828,6 +2830,15 @@ class Solution(collections.abc.Mapping):
 
       ldsNumElements = max(ldsNumElements, ldsNumElementsRemapC)
 
+    # check B2B Gemm cases
+    if state["ProblemType"]["B2BGemm"] is True:
+      if state["ProblemType"]["TLUB"]:
+        reject("B2B Gemm only support TLUB == false")
+      if state["MacroTile1"] != 256 and state["MacroTile1"] != 128 and state["MacroTile1"] != 64:
+        reject("B2B Gemm only support MT1 == 64, 128, or 256")
+      b2bGEMMLdsNumElements = roundUpToNearestMultiple(numElementsPerWorkGroup, ldsAlign)
+      ldsNumElements = max(ldsNumElements, b2bGEMMLdsNumElements)
+
     state["LdsNumElements"] = ldsNumElements
     ldsSize = ldsNumElements * state["ProblemType"]["DataType"].numBytes()
     if ldsSize > globalParameters["MaxLDS"]:
@@ -3052,8 +3063,8 @@ class Solution(collections.abc.Mapping):
         reject(state, "Use E does not support len(PackedC1IndicesX) > 1.")
       if not state["BufferStore"]:
         reject(state, "Use E only supports BufferStore due to no suppress no store.")
-      if state["StoreRemapVectorWidth"] and (state["GlobalSplitU"] == 1):
-        reject(state, "Use E does not support StoreRemapVectorWidth if GSU == 1.")
+      if state["StoreRemapVectorWidth"]:
+        reject(state, "Use E does not support StoreRemapVectorWidth.")
       if state["GroupLoadStore"]:
         reject(state, "Use E does not support GroupLoadStore.")
 
@@ -3100,7 +3111,9 @@ class Solution(collections.abc.Mapping):
     if "MatrixInstM" in nonCKObjs[0]._state:
       # Use MIWaveGroup and MIWaveTile instead of WG and MT
       requiredParameters["MIWaveTile"]  = True
+      requiredParameters["MIWaveGroup"] = True
       requiredParameters["ThreadTile"]  = False
+      requiredParameters["WorkGroup"] = False
 
     requiredParameters["ProblemType"]       = False # always prepended
     requiredParameters["MacroTile0"]        = False # always prepended
@@ -3130,7 +3143,9 @@ class Solution(collections.abc.Mapping):
     if "MatrixInstM" in state:
       # Use MIWaveGroup and MIWaveTile instead of WG and MT
       requiredParameters["MIWaveTile"]  = True
+      requiredParameters["MIWaveGroup"]  = True
       requiredParameters["ThreadTile"]  = False
+      requiredParameters["WorkGroup"]  = False
     return Solution.getNameMin(state, requiredParameters)
 
   ########################################

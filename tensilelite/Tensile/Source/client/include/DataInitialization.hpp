@@ -123,6 +123,11 @@ namespace Tensile
                 {
                     return prepareCPUInputs(groupedProblem->gemms[0]);
                 }
+                else if(auto b2bProblem
+                   = dynamic_cast<ContractionProblemB2BGemm const*>(problem))
+                {
+                    return prepareCPUInputs(b2bProblem->gemms[0]);
+                }
                 else if(auto gemmProblem = dynamic_cast<ContractionProblemGemm const*>(problem))
                 {
                     return prepareCPUInputs(*gemmProblem);
@@ -177,6 +182,11 @@ namespace Tensile
                    = dynamic_cast<ContractionProblemGroupedGemm const*>(problem))
                 {
                     return prepareGPUInputs(groupedProblem->gemms[0]);
+                }
+                else if(auto b2bProblem
+                   = dynamic_cast<ContractionProblemB2BGemm const*>(problem))
+                {
+                    return prepareGPUInputs(b2bProblem->gemms[0]);
                 }
                 else if(auto gemmProblem = dynamic_cast<ContractionProblemGemm const*>(problem))
                 {
@@ -609,10 +619,9 @@ namespace Tensile
                 return 0;
             };
             virtual void setNumEnqueuesPerSync(size_t count) override{};
-            virtual void preEnqueues(hipStream_t const& stream) override{};
+            virtual void preEnqueues() override{};
             virtual void postEnqueues(TimingEvents const& startEvents,
-                                      TimingEvents const& stopEvents,
-                                      hipStream_t const&  stream) override{};
+                                      TimingEvents const& stopEvents) override{};
             virtual void validateEnqueues(std::shared_ptr<ProblemInputs> inputs,
                                           TimingEvents const&            startEvents,
                                           TimingEvents const&            stopEvents) override{};
@@ -656,6 +665,7 @@ namespace Tensile
             {
                 std::string                      name;
                 InitMode                         init;
+                size_t                           offset;
                 std::map<DataType, PristineUnit> pristine;
             };
 

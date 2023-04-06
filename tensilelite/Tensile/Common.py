@@ -155,6 +155,11 @@ globalParameters["DataInitTypeBias"] = 3
 globalParameters["DataInitTypeScaleD"] = 3
 globalParameters["DataInitValueActivationArgs"] = [2.0, 2.0]
 globalParameters["CEqualD"] = False               # Set to true if testing for the case where the pointer to C is the same as D.
+globalParameters["BufferOffsetA"] = 0             # data offset of buffer A
+globalParameters["BufferOffsetB"] = 0             # data offset of buffer B
+globalParameters["BufferOffsetC"] = 0             # data offset of buffer C
+globalParameters["BufferOffsetD"] = 0             # data offset of buffer D
+globalParameters["BufferOffsetE"] = 0             # data offset of buffer E
 
 # build parameters
 globalParameters["CMakeCXXFlags"] = ""            # pass flags to cmake
@@ -1054,7 +1059,8 @@ defaultProblemType = {
     "TransposeB":               True,
     "Batched":                  False,            # add batching dimension
     "StridedBatched":           True,             # use to select general batch or strided batch
-    "GroupedGemm":              False,             # use to select general batch or strided batch
+    "GroupedGemm":              False,            # use to select grouped GEMM
+    "B2BGemm":                  False,            # use to select back-to-back GEMM
 
     # for OperationType == TensorContraction
     # - Indices < NumIndicesC are Free or Batch indices and appear in C and D

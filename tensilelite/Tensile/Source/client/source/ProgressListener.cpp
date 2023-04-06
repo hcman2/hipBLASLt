@@ -98,6 +98,14 @@ namespace Tensile
                     sizes.push_back(it.problemSizes());
                 m_reporter->report(ResultKey::ProblemSizes, sizes);
             }
+            else if(auto b2bProblem = dynamic_cast<const ContractionProblemB2BGemm*>(problem))
+            {
+                writeReport(b2bProblem->gemms[0]);
+                std::vector<std::vector<size_t>> sizes;
+                for(auto& it : b2bProblem->gemms)
+                    sizes.push_back(it.problemSizes());
+                m_reporter->report(ResultKey::ProblemSizes, sizes);
+            }
             else if(auto gemmProblem = dynamic_cast<const ContractionProblemGemm*>(problem))
             {
                 writeReport(*gemmProblem);
@@ -159,11 +167,10 @@ namespace Tensile
 
         void ProgressListener::setNumEnqueuesPerSync(size_t count) {}
 
-        void ProgressListener::preEnqueues(hipStream_t const& stream) {}
+        void ProgressListener::preEnqueues() {}
 
         void ProgressListener::postEnqueues(TimingEvents const& startEvents,
-                                            TimingEvents const& stopEvents,
-                                            hipStream_t const&  stream)
+                                            TimingEvents const& stopEvents)
         {
         }
 

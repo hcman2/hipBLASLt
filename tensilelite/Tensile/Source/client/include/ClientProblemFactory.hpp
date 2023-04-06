@@ -66,12 +66,14 @@ namespace Tensile
 
             std::vector<DataType>                         m_tensorTypes;
             std::vector<std::vector<std::vector<size_t>>> m_tensorStrides;
+            std::vector<size_t>                           m_tensorOffsets;
 
             std::vector<DataType> m_constantTypes;
             std::vector<double>   m_constantValues;
 
             bool m_stridedBatched;
             bool m_groupedGemm;
+            bool m_b2bGemm;
             bool m_highPrecisionAccumulate;
             bool m_deterministicMode;
             bool m_cEqualsD;
