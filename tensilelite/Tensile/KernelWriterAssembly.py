@@ -7811,6 +7811,14 @@ class KernelWriterAssembly(KernelWriter):
       module.add(vectorStaticDivide(vIdx, vIdx, instN, None))
       module.add(staticMultiply(vgpr(vIdx), vgpr(vIdx), vectorLen * elemNumBytes, None))
       module.add(VAddU32(vgpr(coord1), vgpr(vIdx), vgpr(coord1)))
+
+      #Use StridesB register to store the waveTile offset for waveTileN > 1
+      waveTileN = kernel["MIWaveTile"][1]
+      waveMT1 = kernel["MatrixInstN"] * kernel["MatrixInstBN"]
+      waveGroupM, waveGroupN = kernel["MIWaveGroup"]
+      strideN = waveMT1 * waveGroupN #since we assume MT1 == K1
+      if waveTileN > 1:
+        module.add(SMulI32(dst=sgpr('StridesB'), src0=sgpr('StridesB'), src1=strideN * elemNumBytes, comment="Calculate waveTileOffsetBytes"))
       self.vgprPool.checkIn(tid)
       return module, coord1
 
@@ -7848,10 +7856,12 @@ class KernelWriterAssembly(KernelWriter):
     vw, elements = comp(self, kernel, False)
 
     tStride0 = kernel["WavefrontSize"] // kernel["MatrixInstN"] * vw
-    tStride1 = kernel["MatrixInstN"] * kernel["MatrixInstM"] * kernel["MatrixInstBM"] * kernel["MIWaveGroup"][0] * kernel["MIWaveTile"][0]
-    tWaviTileStride0 = kernel["MatrixInstM"] * kernel["MatrixInstBM"] * kernel["MIWaveGroup"][0]
-    #Get the number of t0 for single waveTile
+    tStride1 = kernel["MatrixInstN"] * kernel["MacroTile0"] # * kernel["MatrixInstBM"] * kernel["MIWaveGroup"][0] * kernel["MIWaveTile"][0]
+    tWaveTileStride0 = kernel["MatrixInstM"] * kernel["MatrixInstBM"] * kernel["MIWaveGroup"][0]
+    #Get the number of t0/t1 for single waveTile
     numT0InSingleWT = kernel["MatrixInstM"] * kernel["MatrixInstBM"] // tStride0
+    numT1InSingleWT = kernel["MatrixInstBN"]
+    tWaveTileStride1 = tStride1 * kernel["MatrixInstBN"] * kernel["MIWaveGroup"][1]
 
     offsetVgpr = self.vgprPool.checkOut(1)
     numRegPerVec: int = round(vw * dstDataType.numRegisters())
@@ -7859,9 +7869,13 @@ class KernelWriterAssembly(KernelWriter):
     for i, (t1, t0, vc1, vc0) in enumerate(elements):
       #TODO: handle vc1 or vc0 > 0
       assert (vc0, vc1) == (0, 0)
-      jumpBM = t0 % numT0InSingleWT
+      jumpBM  = t0 % numT0InSingleWT
       jumpWtM = t0 // numT0InSingleWT
-      vectorByteOffset = (jumpBM * tStride0 + jumpWtM * tWaviTileStride0 + t1 * tStride1) * self.states.bpeCexternal
+      jumpM   = jumpBM * tStride0 + jumpWtM * tWaveTileStride0
+      jumpBN  = t1 % numT1InSingleWT
+      jumpWtN = t1 // numT1InSingleWT
+      jumpN   = jumpBN * tStride1 + jumpWtN * tWaveTileStride1
+      vectorByteOffset = (jumpM + jumpN) * self.states.bpeCexternal
       mod.add(self.b2bgemmAddLocalWrite(vw, vectorByteOffset, archVgprIdx + i * numRegPerVec, coordByteOffsetVgpr))
 
     mod.add(SWaitCnt(lgkmcnt=0))
@@ -7993,15 +8007,21 @@ class KernelWriterAssembly(KernelWriter):
     waveMT0, waveMT1 = kernel["MatrixInstM"] * BM, kernel["MatrixInstN"] * BN
     waveGroupM, waveGroupN = kernel["MIWaveGroup"]
     strideM, strideN = 1, waveMT1 * waveGroupN #since we assume MT1 == K1
+    #if waveTileN > 1:
+    #  module.add(SMulI32(dst=sgpr('StridesB'), src0=sgpr('StridesB'), src1=strideN * elemNumBytes, comment="Calculate waveTileOffsetBytes"))
     for wn in range(waveTileN):
       # vgprs layout |(n, 0)|(n, 1)|(n, 2)|(n, 3)|
       vgprIdx = self.b2bgemmCalcInputVgprIdx(loadVgpr, numVgprRequiredPerVector, wn)
-      waveTileOffset = wn * strideN # in element
-      waveTileOffsetBytes = waveTileOffset * elemNumBytes
+      #waveTileOffset = wn * strideN # in element
+      #waveTileOffsetBytes = waveTileOffset * elemNumBytes
       readByteOffsetVgpr = self.vgprPool.checkOut(2)
-      module.add(VMovB32(vgpr(readByteOffsetVgpr + 1), kIdx * strideM * elemNumBytes))
-      module.add(VAddU32(vgpr(readByteOffsetVgpr), vgpr(colVgprIdx), vgpr(readByteOffsetVgpr + 1)))
-      module.add(self.chooseGlobalRead(True, numBytesPerVectorLoad, vgprIdx, vgpr(readByteOffsetVgpr), sgpr("SrdB", 4), 0, waveTileOffsetBytes))
+      if wn == 0:
+        module.add(VMovB32(vgpr(readByteOffsetVgpr + 1), kIdx * strideM * elemNumBytes))
+        module.add(VAddU32(vgpr(readByteOffsetVgpr), vgpr(colVgprIdx), vgpr(readByteOffsetVgpr + 1)))
+      else:
+        #need to mul waveTileOffsetBytes by StridesB
+        module.add(VAddU32(vgpr(readByteOffsetVgpr), sgpr('StridesB'), vgpr(readByteOffsetVgpr)))
+      module.add(self.chooseGlobalRead(True, numBytesPerVectorLoad, vgprIdx, vgpr(readByteOffsetVgpr), sgpr("SrdB", 4), 0, 0))
       self.vgprPool.checkIn(readByteOffsetVgpr)
 
     module.add(SWaitCnt(vmcnt=0, comment="Wait for VM"))
@@ -8223,7 +8243,9 @@ class KernelWriterAssembly(KernelWriter):
     lrbSetupCode, lrbColVgprIdx = self.b2bgemmCalculateGlobalReadBInitialIndex(dupKernel, waveGroupM, wavelen, instN, instK, instB, BN)
     module.add(lraSetupCode)
     module.add(lrbSetupCode)
+    module.add(Label("label_b2bg_calculate_addr_done",""))
     module.add(self.b2bgemmLocalWriteA1(dupKernel))
+    module.add(Label("label_b2bg_local_write_done",""))
     module.add(self.b2bgemmInitC(dupKernel))
 
 
@@ -8234,6 +8256,7 @@ class KernelWriterAssembly(KernelWriter):
       lraCode, aVgpr, aNumVgprs = self.b2bgemmLocalReadA1(dupKernel, tPA, lraRowVgprIdx, i * miK)
       module.add(lraCode)
       module.add(SNop(1))
+      module.add(Label("label_b2bg_before_mfma_" + str(i),""))
       module.add(self.b2bgemmMatmul(dupKernel, aVgpr, bVgpr, miM, miN, miK))
       self.vgprPool.checkIn(aVgpr)
       self.vgprPool.checkIn(bVgpr)
