@@ -1,0 +1,87 @@
+GlobalParameters:
+  NumElementsToValidate: -1
+  MinimumRequiredVersion: 4.14.0
+  PrintLevel: 1
+  PrintSolutionRejectionReason: True
+  Device: 2
+  CMakeBuildType: Debug
+  MergeFiles: False
+  KernelTime: True
+    #CMakeBuildType: Debug
+  #MaxWorkspaceSize: 13421772800
+  CpuThreads: 1
+  GenerateSourceAndExit: False
+  NumWarmups: 1
+  DataInitTypeAlpha: 1
+  DataInitTypeBeta: 0
+  DataInitTypeA: 3
+  DataInitTypeB: 3
+
+BenchmarkProblems:
+  ########################################
+  # NN - standard
+  ########################################
+  -
+    - # ProblemType
+      OperationType: GEMM
+      DataType: h
+      #DestDataType: h
+      TransposeA: False
+      TransposeB: False
+      UseBeta: True
+      Batched: True
+      HighPrecisionAccumulate: True
+      Activation: False
+      ActivationHPA: False
+      B2BGemm: True
+
+
+    - # BenchmarkProblemSizeGroup - Standard
+      InitialSolutionParameters:
+      BenchmarkCommonParameters:
+      ForkParameters:
+        - KernelLanguage: ["Assembly"]
+        - PrefetchLocalRead: [1]
+        - PrefetchGlobalRead: [1]
+        - WorkGroupMapping: [1]
+        - DepthU: [32]
+        - VectorWidth: [-1]
+        - GlobalSplitU: [1]
+        - SourceSwap: [False]
+        - GlobalSplitUAlgorithm: ["SingleBuffer"]
+        - ScheduleIterAlg: [3]
+        - MatrixInstruction: 
+          - [16, 16, 4, 4, 1, 1, 1, 1, 4]
+          - [16, 16, 4, 4, 1, 2, 1, 2, 4]
+          - [16, 16, 4, 4, 2, 2, 2, 1, 4]
+          - [16, 16, 4, 4, 1, 2, 2, 2, 2]
+          - [16, 16, 4, 4, 4, 1, 4, 1, 4]
+          - [16, 16, 4, 4, 4, 2, 4, 1, 4]
+          - [16, 16, 16, 1, 1, 1, 4, 1, 4]
+          - [16, 16, 16, 1, 1, 2, 4, 1, 4]
+          - [16, 16, 16, 1, 1, 1, 4, 2, 4]
+          - [32, 32, 4, 2, 1, 1, 1, 1, 4]
+          - [32, 32, 4, 2, 1, 1, 4, 1, 1]
+          - [32, 32, 4, 2, 1, 4, 1, 1, 4]
+          - [32, 32, 4, 2, 1, 2, 2, 2, 2]
+          - [32, 32, 8, 1, 1, 1, 4, 1, 2]
+          - [32, 32, 8, 1, 1, 1, 2, 1, 4]
+          - [32, 32, 8, 1, 1, 2, 2, 1, 4]
+          - [32, 32, 8, 1, 1, 1, 2, 2, 4]
+        - AssertFree0ElementMultiple: [8]
+        - OptNoLoadLoop: [0]
+        - TransposeLDS: [1]
+        - LdsBlockSizePerPad: [128]
+        - LdsPadA: [8]
+        - LdsPadB: [8]
+        - WaveSeparateGlobalReadA: [0]
+        - WaveSeparateGlobalReadB: [1]
+        - 1LDSBuffer: [0,1]
+      BenchmarkForkParameters:
+      JoinParameters:
+      BenchmarkJoinParameters:
+      BenchmarkFinalParameters:
+        - ProblemSizes:
+          - Exact: [26624, 256, 1, 1000]
+
+

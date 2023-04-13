@@ -7838,6 +7838,7 @@ class KernelWriterAssembly(KernelWriter):
 
   def b2bgemmLocalWriteA1(self, kernel) -> Module:
     mod = Module("B2BGEMM Local Write")
+    mod.add(SBarrier(comment="Make sure that all mfma are done before accessing accVgprs"))
     accToArchCode, archVgprIdx, numArchVgprs = self.b2bgemmCopyAccToArch(kernel)
     mod.add(accToArchCode)
     dstDataType: DataType = kernel["ProblemType"]["DestDataType"]
@@ -8007,13 +8008,9 @@ class KernelWriterAssembly(KernelWriter):
     waveMT0, waveMT1 = kernel["MatrixInstM"] * BM, kernel["MatrixInstN"] * BN
     waveGroupM, waveGroupN = kernel["MIWaveGroup"]
     strideM, strideN = 1, waveMT1 * waveGroupN #since we assume MT1 == K1
-    #if waveTileN > 1:
-    #  module.add(SMulI32(dst=sgpr('StridesB'), src0=sgpr('StridesB'), src1=strideN * elemNumBytes, comment="Calculate waveTileOffsetBytes"))
     for wn in range(waveTileN):
       # vgprs layout |(n, 0)|(n, 1)|(n, 2)|(n, 3)|
       vgprIdx = self.b2bgemmCalcInputVgprIdx(loadVgpr, numVgprRequiredPerVector, wn)
-      #waveTileOffset = wn * strideN # in element
-      #waveTileOffsetBytes = waveTileOffset * elemNumBytes
       readByteOffsetVgpr = self.vgprPool.checkOut(2)
       if wn == 0:
         module.add(VMovB32(vgpr(readByteOffsetVgpr + 1), kIdx * strideM * elemNumBytes))
@@ -8198,11 +8195,22 @@ class KernelWriterAssembly(KernelWriter):
     miInInstType, miOutInstType = dataTypeToMfmaInstTypePair(kernel["ProblemType"]["DataType"], \
           kernel["ProblemType"]["Fp16AltImpl"])
     mfma_1k = True if (kernel["MFMA_BF16_1K"] or kernel["ProblemType"]["Fp16AltImpl"]) else False
-    waveTileM = kernel["MIWaveGroup"][0]
+    waveTileM = kernel["MIWaveTile"][0]
     miB = kernel["MatrixInstB"]
     numRegOut = kernel["MIRegPerOut"]
     numAccVgprPerWave = ((miM * miN * miB) // wavelen) * numRegOut
-    
+    #hack code B
+    #module.add(VMovB32(vgpr(6), 0x3c003c00))
+    #module.add(VMovB32(vgpr(7), 0x3c003c00))
+    #module.add(VMovB32(vgpr(8), 0x3c003c00))
+    #module.add(VMovB32(vgpr(9), 0x3c003c00))
+    #module.add(VMovB32(vgpr(10), 0x3c003c00))
+    #module.add(VMovB32(vgpr(11), 0x3c003c00))
+    #module.add(VMovB32(vgpr(12), 0x3c003c00))
+    #module.add(VMovB32(vgpr(13), 0x3c003c00))
+    #hack code A
+    #module.add(VMovB32(vgpr(18), 0x50005000))
+    #module.add(VMovB32(vgpr(19), 0x50005000))
     for m, n, in self.makeWaveTileIterator(kernel):
       dstC = self.b2bgemmCalcInputVgprIdx(0, numAccVgprPerWave, m + n * waveTileM)
       srcA = self.b2bgemmCalcInputVgprIdx(a, numVgprRequiredPerVector, m)
@@ -8238,7 +8246,6 @@ class KernelWriterAssembly(KernelWriter):
     waveGroupM, waveGroupN = kernel["MIWaveGroup"]
     wavelen = kernel["WavefrontSize"]
     module.add(self.b2bgemmSetupGlobalReadAddressB1(dupKernel, tPB))
-
     lraSetupCode, lraRowVgprIdx = self.b2bgemmCalculateLocalReadAInitialIndex(dupKernel, waveGroupM, wavelen, instM, instK, instB, BM)
     lrbSetupCode, lrbColVgprIdx = self.b2bgemmCalculateGlobalReadBInitialIndex(dupKernel, waveGroupM, wavelen, instN, instK, instB, BN)
     module.add(lraSetupCode)
@@ -8248,6 +8255,9 @@ class KernelWriterAssembly(KernelWriter):
     module.add(Label("label_b2bg_local_write_done",""))
     module.add(self.b2bgemmInitC(dupKernel))
 
+    b2bgemmPrefetchRead = 1
+    if b2bgemmPrefetchRead >= numIters:
+      b2bgemmPrefetchRead = numIters - 1
 
     for i in range(numIters):
       module.addComment(f"Unrolled iteration {i}")

@@ -1,0 +1,88 @@
+GlobalParameters:
+  NumElementsToValidate: -1
+  MinimumRequiredVersion: 4.14.0
+  PrintLevel: 1
+  PrintSolutionRejectionReason: True
+  Device: 2
+  CMakeBuildType: Debug
+  MergeFiles: False
+  KernelTime: True
+    #CMakeBuildType: Debug
+  #MaxWorkspaceSize: 13421772800
+  CpuThreads: 1
+  GenerateSourceAndExit: False
+  NumWarmups: 1
+  DataInitTypeAlpha: 1
+  DataInitTypeBeta: 0
+  DataInitTypeA: 1
+  DataInitTypeB: 1
+
+BenchmarkProblems:
+  ########################################
+  # NN - standard
+  ########################################
+  -
+    - # ProblemType
+      OperationType: GEMM
+      DataType: h
+      #DestDataType: h
+      TransposeA: False
+      TransposeB: False
+      UseBeta: True
+      Batched: True
+      HighPrecisionAccumulate: True
+      Activation: False
+      ActivationHPA: False
+      B2BGemm: True
+
+
+    - # BenchmarkProblemSizeGroup - Standard
+      InitialSolutionParameters:
+      BenchmarkCommonParameters:
+      ForkParameters:
+        - KernelLanguage: ["Assembly"]
+        - PrefetchLocalRead: [0]
+        - PrefetchGlobalRead: [0]
+        - WorkGroupMapping: [1]
+        - DepthU: [32]
+        - VectorWidth: [-1]
+        - GlobalSplitU: [1]
+        - SourceSwap: [False]
+        - GlobalSplitUAlgorithm: ["SingleBuffer"]
+        - ScheduleIterAlg: [1]
+        - MatrixInstruction: 
+          - [16, 16, 4, 4, 1, 1, 1, 1, 1]
+          - [16, 16, 4, 4, 1, 2, 1, 2, 1]
+          - [16, 16, 4, 4, 2, 2, 2, 1, 1]
+          - [16, 16, 4, 4, 2, 2, 2, 2, 1]
+          - [16, 16, 4, 4, 4, 1, 2, 1, 2]
+          - [16, 16, 4, 4, 4, 2, 2, 2, 2]
+          - [16, 16, 4, 4, 1, 4, 1, 2, 1]
+          - [16, 16, 16, 1, 1, 1, 2, 1, 2]
+          - [16, 16, 16, 1, 1, 2, 2, 1, 2]
+          - [16, 16, 16, 1, 1, 2, 2, 2, 2]
+          - [16, 16, 16, 1, 1, 2, 4, 2, 1]
+          - [16, 16, 16, 1, 1, 2, 4, 1, 1]
+          - [16, 16, 16, 1, 1, 1, 2, 2, 2]
+          - [32, 32, 4, 2, 1, 2, 1, 1, 1]
+          - [32, 32, 4, 2, 1, 1, 1, 1, 1]
+          - [32, 32, 4, 2, 1, 2, 1, 2, 1]
+          - [32, 32, 4, 2, 1, 2, 1, 4, 1]
+          - [32, 32, 4, 2, 1, 4, 1, 2, 1]
+          - [32, 32, 4, 2, 2, 2, 2, 2, 1]
+          - [32, 32, 4, 2, 2, 2, 1, 2, 2]
+          - [32, 32, 8, 1, 1, 1, 2, 1, 1]
+          - [32, 32, 8, 1, 1, 4, 1, 1, 2]
+          - [32, 32, 8, 1, 1, 1, 2, 4, 1]
+          - [32, 32, 8, 1, 1, 2, 1, 2, 2]
+          - [32, 32, 8, 1, 1, 4, 1, 2, 2]
+        - AssertFree0ElementMultiple: [8]
+        - OptNoLoadLoop: [0]
+      BenchmarkForkParameters:
+      JoinParameters:
+      BenchmarkJoinParameters:
+      BenchmarkFinalParameters:
+        - ProblemSizes:
+          - Exact: [26624, 64, 1, 1000]
+
+
