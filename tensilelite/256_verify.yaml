@@ -4,7 +4,7 @@ GlobalParameters:
   PrintLevel: 1
   PrintSolutionRejectionReason: True
   Device: 2
-  CMakeBuildType: Debug
+  #CMakeBuildType: Debug
   MergeFiles: False
   KernelTime: True
     #CMakeBuildType: Debug
@@ -41,15 +41,15 @@ BenchmarkProblems:
       BenchmarkCommonParameters:
       ForkParameters:
         - KernelLanguage: ["Assembly"]
-        - PrefetchLocalRead: [1]
-        - PrefetchGlobalRead: [1]
+        - PrefetchLocalRead: [0]
+        - PrefetchGlobalRead: [0]
         - WorkGroupMapping: [1]
         - DepthU: [32]
         - VectorWidth: [-1]
         - GlobalSplitU: [1]
         - SourceSwap: [False]
         - GlobalSplitUAlgorithm: ["SingleBuffer"]
-        - ScheduleIterAlg: [3]
+        - ScheduleIterAlg: [1]
         - MatrixInstruction: 
           - [16, 16, 4, 4, 1, 1, 1, 1, 4]
           - [16, 16, 4, 4, 1, 2, 1, 2, 4]
@@ -71,17 +71,12 @@ BenchmarkProblems:
         - AssertFree0ElementMultiple: [8]
         - OptNoLoadLoop: [0]
         - TransposeLDS: [1]
-        - LdsBlockSizePerPad: [128]
-        - LdsPadA: [8]
-        - LdsPadB: [8]
-        - WaveSeparateGlobalReadA: [0]
-        - WaveSeparateGlobalReadB: [1]
-        - 1LDSBuffer: [0,1]
+        - 1LDSBuffer: [0]
       BenchmarkForkParameters:
       JoinParameters:
       BenchmarkJoinParameters:
       BenchmarkFinalParameters:
         - ProblemSizes:
-          - Exact: [26624, 256, 1, 1000]
+          - Exact: [60800, 256, 1, 256]
 
 

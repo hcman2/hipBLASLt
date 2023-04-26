@@ -4,7 +4,7 @@ GlobalParameters:
   PrintLevel: 1
   PrintSolutionRejectionReason: True
   Device: 2
-  CMakeBuildType: Debug
+  #CMakeBuildType: Debug
   MergeFiles: False
   KernelTime: True
     #CMakeBuildType: Debug

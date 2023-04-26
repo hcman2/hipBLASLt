@@ -1081,6 +1081,9 @@ class Solution(collections.abc.Mapping):
     if (not state["ProblemType"]["StridedBatched"]) and (state["ProblemType"]["OperationType"] != 'GEMM'):
       reject(state, "General Batched GEMM only support GEMM OperationType")
 
+    if (state["ProblemType"]["B2BGemm"]) and (state["OptNoLoadLoop"]):
+      reject(state, "B2B GEMM doesn't support OptNoLoadLoop")
+
     Solution.MatrixInstructionToMIParameters(state)
     EnableMatrixInstruction = state["EnableMatrixInstruction"] if "EnableMatrixInstruction" in state else None
     if EnableMatrixInstruction == None:

@@ -326,6 +326,7 @@ class ReadWriteInstruction(Instruction):
     def __init__(self, instType: InstType, rwType: RWType, comment="") -> None:
         super().__init__(instType, comment)
         self.rwType = rwType
+        self.appendDone = False
 
     def typeConvert(self) -> str:
         kStr = ""
@@ -360,7 +361,9 @@ class ReadWriteInstruction(Instruction):
 
     def preStr(self):
         # Local read is set in DSLoad and DSStore
-        self.instStr += self.typeConvert()
+        if self.appendDone == False:
+            self.instStr += self.typeConvert()
+            self.appendDone = True
 
     @abc.abstractmethod
     def toList(self) -> list:
@@ -2142,3 +2145,19 @@ class VRndneF32(CommonInstruction):
     def __init__(self, dst, src, comment="") -> None:
         super().__init__(InstType.INST_F32, dst, [src], None, None, comment)
         self.setInst("v_rndne_f32")
+
+# VNop
+class VNop(Instruction):
+    def __init__(self, waitState: int, comment="") -> None:
+        super().__init__(InstType.INST_NOTYPE, comment)
+        self.waitState = waitState
+        self.setInst("v_nop")
+
+    def getParams(self) -> list:
+        return [self.waitState]
+
+    def toList(self) -> list:
+        return [self.instStr, self.waitState, self.comment]
+
+    def __str__(self) -> str:
+        return self.formatWithComment(self.instStr + " " + str(self.waitState))
