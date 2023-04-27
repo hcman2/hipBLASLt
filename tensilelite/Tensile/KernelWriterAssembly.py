@@ -7876,7 +7876,8 @@ class KernelWriterAssembly(KernelWriter):
 
     for i, (t1, t0, vc1, vc0) in enumerate(elements):
       #TODO: handle vc1 or vc0 > 0
-      assert (vc0, vc1) == (0, 0)
+      # assert (vc0, vc1) == (0, 0)
+      print("t1, t0, vc1, vc0 = ", t1,",",t0,",",vc1,",",vc0)
       jumpBM  = t0 % numT0InSingleWT
       jumpWtM = t0 // numT0InSingleWT
       jumpM   = jumpBM * tStride0 + jumpWtM * tWaveTileStride0
@@ -8259,13 +8260,15 @@ class KernelWriterAssembly(KernelWriter):
         iterCode.add(macIterCode)
       else:
         #schedule LR to half of mfma
-        numLRPerMFMA = numLRToSchedule // (numMfmaPerIter // 2)
-        numLRPerMFMA = max(numLRPerMFMA, 1)
+        stIdxLR = 0
         endIdxLR = numMfmaPerIter // 2
+        numLRPerMFMA = numLRToSchedule // (endIdxLR - stIdxLR + 1)
+        numLRPerMFMA = max(numLRPerMFMA, 1)
 
-        numGRPerMFMA = numVMCntPerMFMA // (numMfmaPerIter // 2)
-        numGRPerMFMA = max(numGRPerMFMA, 1)
-        endIdxGR = numMfmaPerIter // 2
+        stIdxGR = 3
+        endIdxGR = numMfmaPerIter - 1
+        numGRPerMFMA = numVMCntPerMFMA / (endIdxGR - stIdxGR + 1)
+        numGRscheduled = 0
 
         #iterCode.add(grCode)
         #iterCode.add(localReadCode)
@@ -8290,11 +8293,13 @@ class KernelWriterAssembly(KernelWriter):
           ####
           # scheduled Global read
           ####
-          for j in range(numGRPerMFMA):
+          #for j in range(numGRPerMFMA):
+          while numGRscheduled < numGRPerMFMA * (i - stIdxGR + 1) and i >= stIdxGR:
             if grCode.items():
               loadModule = grCode.items().pop(0)
               iterCode.add(loadModule)
               numAdditionalGR += 1
+            numGRscheduled += 1
           if i == endIdxGR:
             while grCode.items():
               loadModule = grCode.items().pop(0)
