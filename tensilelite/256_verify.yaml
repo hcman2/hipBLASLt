@@ -41,8 +41,8 @@ BenchmarkProblems:
       BenchmarkCommonParameters:
       ForkParameters:
         - KernelLanguage: ["Assembly"]
-        - PrefetchLocalRead: [0]
-        - PrefetchGlobalRead: [0]
+        - PrefetchLocalRead: [1]
+        - PrefetchGlobalRead: [1]
         - WorkGroupMapping: [1]
         - DepthU: [32]
         - VectorWidth: [-1]
