@@ -2839,7 +2839,10 @@ class Solution(collections.abc.Mapping):
         reject("B2B Gemm only support TLUB == false")
       if state["MacroTile1"] != 256 and state["MacroTile1"] != 128 and state["MacroTile1"] != 64:
         reject("B2B Gemm only support MT1 == 64, 128, or 256")
-      b2bGEMMLdsNumElements = roundUpToNearestMultiple(numElementsPerWorkGroup, ldsAlign)
+      state["b2bGemmLdsAPad"] = 4
+      b2bGEMMLdsAPad = state["b2bGemmLdsAPad"]
+      b2bGEMMNumElementsPerWorkGroup = (state["MacroTile0"]+b2bGEMMLdsAPad)*state["MacroTile1"]
+      b2bGEMMLdsNumElements = roundUpToNearestMultiple(b2bGEMMNumElementsPerWorkGroup, ldsAlign)
       ldsNumElements = max(ldsNumElements, b2bGEMMLdsNumElements)
 
     state["LdsNumElements"] = ldsNumElements

@@ -1057,6 +1057,7 @@ class KernelWriterAssembly(KernelWriter):
         module.add(self.undefineSgpr("SmallMagicNumberDivWg01"))
       else:
         module.add(moduleArgs)
+        #module.add(SBranch(labelName="label_b2bg_start"))
     else:
       module.add(ValueIf(0))
 
@@ -7645,7 +7646,7 @@ class KernelWriterAssembly(KernelWriter):
     ldsStride = tmpV0+2
     coord0 = tmpV0+3
     waveCoord1 = tmpV0+4
-    ldsPad = 0
+    ldsPad = kernel["b2bGemmLdsAPad"]
     instM, instN = kernel["MatrixInstM"], kernel["MatrixInstN"]
     BM, BN = kernel["MatrixInstBM"], kernel["MatrixInstBN"]
     wavelen = kernel["WavefrontSize"]
@@ -7739,7 +7740,9 @@ class KernelWriterAssembly(KernelWriter):
       numVgprRequiredPerVector = numTotalDataFromA1 // wavelen // 4
       vectorLen = numVgprRequiredPerVector * 4 // elemNumBytes
       waveTileM = kernel["MIWaveTile"][0]
+      ldsPad = kernel["b2bGemmLdsAPad"]
       ldsStride = waveGroupM * waveTileM * instM * instBM
+      ldsStride += ldsPad
       module.addComment("LocalReadA Get wave id and thread id(0..%s)" % (wavelen-1))
       module.add(vectorStaticDivideAndRemainder(wid, tid, 'Serial', wavelen, None))
       module.addComment("Mod by waveGroupM(%s)" % waveGroupM)
@@ -7759,7 +7762,8 @@ class KernelWriterAssembly(KernelWriter):
       numThdPerInst = (instK // vectorLen) * instM
       module.add(vectorStaticRemainder(None, vIdx, tid, numThdPerInst, None, None))
       module.add(vectorStaticDivide(vIdx, vIdx, instM, None))
-      module.add(staticMultiply(vgpr(vIdx), vgpr(vIdx), vectorLen * ldsStride, None))
+      with self.allocTmpSgpr(1) as tmpSgprInfo:
+        module.add(staticMultiply(vgpr(vIdx), vgpr(vIdx), vectorLen * ldsStride, tmpSgprInfo))
       module.add(VAddU32(vgpr(coord0), vgpr(vIdx), vgpr(coord0)))
       module.add(staticMultiply(vgpr(coord0), vgpr(coord0), elemNumBytes, None))
       self.vgprPool.checkIn(tid)
@@ -7863,8 +7867,9 @@ class KernelWriterAssembly(KernelWriter):
     mod.add(storeAddrCalcCode)
     vw, elements = comp(self, kernel, False)
 
+    ldsPad = kernel["b2bGemmLdsAPad"]
     tStride0 = kernel["WavefrontSize"] // kernel["MatrixInstN"] * vw
-    tStride1 = kernel["MatrixInstN"] * kernel["MacroTile0"] # * kernel["MatrixInstBM"] * kernel["MIWaveGroup"][0] * kernel["MIWaveTile"][0]
+    tStride1 = kernel["MatrixInstN"] * (kernel["MacroTile0"] + ldsPad)
     tWaveTileStride0 = kernel["MatrixInstM"] * kernel["MatrixInstBM"] * kernel["MIWaveGroup"][0]
     #Get the number of t0/t1 for single waveTile
     numT0InSingleWT = kernel["MatrixInstM"] * kernel["MatrixInstBM"] // tStride0
@@ -8058,7 +8063,7 @@ class KernelWriterAssembly(KernelWriter):
     MIWaveGroupShape = [ kernel["MatrixInstM"] * kernel["MatrixInstBM"] * kernel["MIWaveGroup"][0] * vectorWidth, \
                           kernel["MatrixInstN"] * kernel["MatrixInstBN"] * kernel["MIWaveGroup"][1] * vwB]
 
-    LdsPad           = 0
+    LdsPad           = kernel["b2bGemmLdsAPad"]
     tileStride       = 1
     UnrollStride     = kernel["MacroTile%s" % tc] + LdsPad
 
@@ -8160,8 +8165,9 @@ class KernelWriterAssembly(KernelWriter):
     BM = kernel["MatrixInstBM"]
     BN = kernel["MatrixInstB"] // BM
     waveMT0, waveMT1 = kernel["MatrixInstM"] * BM, kernel["MatrixInstN"] * BN
+    ldsPad = kernel["b2bGemmLdsAPad"]
     waveGroupM, waveGroupN = kernel["MIWaveGroup"]
-    strideM, strideN = 1, waveMT0 * waveGroupM * waveTileM#since we assume MT1 == K1
+    strideM, strideN = 1, (waveMT0 * waveGroupM * waveTileM) + ldsPad#since we assume MT1 == K1
     packs = []
 
     for wm in range(1):#range(waveTileM):
@@ -8228,7 +8234,8 @@ class KernelWriterAssembly(KernelWriter):
             while packIterItem:
               item = packIterItem.pop(0)
               iterCode.add(item)
-            iterCode.add(VNop(1, "Wait for packed vgpr read"))
+            iterCode.add(VNop("Wait for packed vgpr read"))
+            iterCode.add(VNop("Wait for packed vgpr read"))
             item = macIterItem.pop(0)
             iterCode.add(item)
           else:
@@ -8394,7 +8401,16 @@ class KernelWriterAssembly(KernelWriter):
     waveTileM, waveTileN = kernel["MIWaveTile"]
     wavelen = kernel["WavefrontSize"]
 
-    dupKernel["PrefetchGlobalRead"] = 3 if kernel["PrefetchGlobalRead"] else 0
+    b2bgemmLdsAPad = kernel["b2bGemmLdsAPad"]
+
+    #dupKernel["PrefetchGlobalRead"] = 3 if kernel["PrefetchGlobalRead"] else 0
+    # test code
+    if kernel["PrefetchGlobalRead"] == 0:
+      dupKernel["PrefetchGlobalRead"] = 1
+    if kernel["PrefetchGlobalRead"] == 1:
+      dupKernel["PrefetchGlobalRead"] = 3
+    if kernel["PrefetchGlobalRead"] == 2:
+      dupKernel["PrefetchGlobalRead"] = 5
     dupKernel["PrefetchLocalRead"] = 1 if kernel["PrefetchLocalRead"] else 0
 
     b2bgemmPrefetchGlobalRead = dupKernel["PrefetchGlobalRead"]
@@ -8409,6 +8425,8 @@ class KernelWriterAssembly(KernelWriter):
     aVgprPrefetch = [0 for i in range(numIters)]
     packCode = [Module() for i in range(numIters)]
 
+
+    module.add(Label("b2bg_start",""))
     module.add(self.b2bgemmSetupGlobalReadAddressB1(dupKernel, tPB))
     lraSetupCode, lraAddrRowVgprIdx = self.b2bgemmCalculateLocalReadAInitialIndex(dupKernel, waveGroupM, wavelen, instM, instK, instB, BM)
     lrbSetupCode, lrbAddrVgprIdx, sgprScalarOffset = self.b2bgemmCalculateGlobalReadBInitialIndex(dupKernel, waveGroupM, wavelen, instN, instK, instB, BN)
@@ -8434,7 +8452,7 @@ class KernelWriterAssembly(KernelWriter):
         if lwItems:
           item = lwItems.pop(0)
           module.add(item)
-    module.add(Label("label_b2bg_local_write_done",""))
+    module.add(Label("b2bg_local_write_done",""))
     module.add(self.b2bgemmInitC(dupKernel))
 
     for i in range(b2bgemmPrefetchLocalRead):  
@@ -8538,6 +8556,7 @@ class KernelWriterAssembly(KernelWriter):
     self.vgprPool.checkIn(lrbAddrVgprIdx)
     self.sgprPool.checkIn(sgprScalarOffset)
 
+    #module.add(SEndpgm(comment="Remove me"), 0)
     return module
 
 def _getEccOffset(totalWidth, bpr, bpe, glvw, idx, numVgprG2L):

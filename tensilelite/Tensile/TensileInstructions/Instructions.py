@@ -2148,9 +2148,9 @@ class VRndneF32(CommonInstruction):
 
 # VNop
 class VNop(Instruction):
-    def __init__(self, waitState: int, comment="") -> None:
+    def __init__(self, comment="") -> None:
         super().__init__(InstType.INST_NOTYPE, comment)
-        self.waitState = waitState
+        self.waitState = 1
         self.setInst("v_nop")
 
     def getParams(self) -> list:
@@ -2160,4 +2160,4 @@ class VNop(Instruction):
         return [self.instStr, self.waitState, self.comment]
 
     def __str__(self) -> str:
-        return self.formatWithComment(self.instStr + " " + str(self.waitState))
+        return self.formatWithComment(self.instStr)
