@@ -486,6 +486,8 @@ class ProblemType(Mapping):
     # name += "_SB" if self["StridedBatched"] else "_GB"
     if self["GroupedGemm"]:
       name += "_GG"
+    elif self["B2BGemm"]:
+      name += "_B2BG"
     else:
       name += "" if self["StridedBatched"] else "_GB" # legacy
 
@@ -1183,6 +1185,9 @@ class Solution(collections.abc.Mapping):
     if (not state["ProblemType"]["StridedBatched"]) and (state["ProblemType"]["OperationType"] != 'GEMM'):
       reject(state, "General Batched GEMM only support GEMM OperationType")
 
+    if (state["ProblemType"]["B2BGemm"]) and (state["OptNoLoadLoop"]):
+      reject(state, "B2B GEMM doesn't support OptNoLoadLoop")
+
     Solution.MatrixInstructionToMIParameters(state)
     EnableMatrixInstruction = state["EnableMatrixInstruction"] if "EnableMatrixInstruction" in state else None
     if EnableMatrixInstruction == None:
@@ -1583,7 +1588,7 @@ class Solution(collections.abc.Mapping):
       state["EnableMatrixInstruction"] = True
 
       # set MIBlock
-      MIBlock_BM = miwg0 // mi[0]
+      MIBlock_BM = mi[4]
       MIBlock_BM = min(MIBlock_BM, mi[3])
       MIBlock_BN = mi[3] // MIBlock_BM
 
@@ -2935,6 +2940,18 @@ class Solution(collections.abc.Mapping):
           ldsBiasMaxElements = max(ldsBiasMaxElements, state["MacroTile0"] * dataType.numBytes())
       ldsNumElements = max(ldsNumElements, state["LdsOffsetBias"] + ldsBiasMaxElements)
 
+    # check B2B Gemm cases
+    if state["ProblemType"]["B2BGemm"] is True:
+      if state["ProblemType"]["TLUB"]:
+        reject("B2B Gemm only support TLUB == false")
+      if state["MacroTile1"] != 256 and state["MacroTile1"] != 128 and state["MacroTile1"] != 64:
+        reject("B2B Gemm only support MT1 == 64, 128, or 256")
+      state["b2bGemmLdsAPad"] = 4
+      b2bGEMMLdsAPad = state["b2bGemmLdsAPad"]
+      b2bGEMMNumElementsPerWorkGroup = (state["MacroTile0"]+b2bGEMMLdsAPad)*state["MacroTile1"]
+      b2bGEMMLdsNumElements = roundUpToNearestMultiple(b2bGEMMNumElementsPerWorkGroup, ldsAlign)
+      ldsNumElements = max(ldsNumElements, b2bGEMMLdsNumElements)
+
     state["LdsNumElements"] = ldsNumElements
     ldsSize = ldsNumElements * state["ProblemType"]["DataType"].numBytes()
     if ldsSize > globalParameters["MaxLDS"]:
@@ -3197,7 +3214,9 @@ class Solution(collections.abc.Mapping):
     if "MatrixInstM" in nonCKObjs[0]._state:
       # Use MIWaveGroup and MIWaveTile instead of WG and MT
       requiredParameters["MIWaveTile"]  = True
+      requiredParameters["MIWaveGroup"] = True
       requiredParameters["ThreadTile"]  = False
+      requiredParameters["WorkGroup"] = False
 
     requiredParameters["ProblemType"]       = False # always prepended
     requiredParameters["MacroTile0"]        = False # always prepended
@@ -3227,7 +3246,9 @@ class Solution(collections.abc.Mapping):
     if "MatrixInstM" in state:
       # Use MIWaveGroup and MIWaveTile instead of WG and MT
       requiredParameters["MIWaveTile"]  = True
+      requiredParameters["MIWaveGroup"]  = True
       requiredParameters["ThreadTile"]  = False
+      requiredParameters["WorkGroup"]  = False
     return Solution.getNameMin(state, requiredParameters)
 
   ########################################

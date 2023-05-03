@@ -534,6 +534,8 @@ class KernelWriterConversion(KernelWriterBase):
     name += self.state["ProblemType"]["DestDataType"].toChar()
     if self.state["ProblemType"]["GroupedGemm"]:
       name += "_GG"
+    elif self.state["ProblemType"]["B2BGemm"]:
+      name += "_B2BG"
     else:
       name += "" if self.state["ProblemType"]["StridedBatched"] else "_GB"
     if self.state["ProblemType"]["UseBias"]:

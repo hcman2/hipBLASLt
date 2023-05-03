@@ -114,6 +114,7 @@ namespace Tensile
                 ("sparse-a",                 po::value<bool>()->default_value(false), "A matrix is sparse matrix.")
                 ("strided-batched",          po::value<bool>()->default_value(true), "Use strided-batched or general batched")
                 ("grouped-gemm",             po::value<bool>()->default_value(false), "Use grouped gemm")
+                ("b2b-gemm",                 po::value<bool>()->default_value(false), "Use back-to-back Gemm")
                 ("kernel-language",          po::value<KernelLanguage>()->default_value(KernelLanguage::Any), "Select kernel language.")
                 ("deterministic-mode",       po::value<bool>()->default_value(false), "Enforce deterministic summation patterns"
                                                                                       "by not splitting U among workgroups")
@@ -505,6 +506,7 @@ int main(int argc, const char* argv[])
     bool runKernels       = !args["selection-only"].as<bool>();
     bool exitOnError      = args["exit-on-error"].as<bool>();
     bool groupedGemm      = args["grouped-gemm"].as<bool>();
+    bool b2bGemm          = args["b2b-gemm"].as<bool>();
 
     if(firstSolutionIdx < 0)
         firstSolutionIdx = library->solutions.begin()->first;

@@ -224,6 +224,11 @@ namespace Tensile
                                                                Hardware const&             hardware,
                                                                hipStream_t stream) const;
 
+        virtual std::vector<KernelInvocation> solveB2BGemm(std::vector<Problem> const& problems,
+                                                           GroupedInputs const&        inputs,
+                                                           Hardware const&             hardware,
+                                                           hipStream_t stream) const;
+
         template <bool T_Debug>
         void singleCallArgs(Problem const&           problem,
                             ContractionInputs const& inputs,
@@ -231,6 +236,7 @@ namespace Tensile
                             uint32_t const&          problemNumGroupTiles1,
                             uint32_t const&          workspaceOffsetInByte,
                             bool const&              isGrouped,
+                            bool const&              isB2BGemm,
                             KernelArguments&         args) const;
 
         template <bool T_Debug>
@@ -241,6 +247,12 @@ namespace Tensile
         KernelInvocation generateSingleCallGroupedGemm(std::vector<Problem> const& problems,
                                                        GroupedInputs const&        inputs,
                                                        KernelArguments&            h_args) const;
+
+        template <bool T_Debug>
+        KernelInvocation generateSingleCallB2BGemm(std::vector<Problem> const& problems,
+                                                   GroupedInputs const&        inputs,
+                                                   Hardware const&             hardware,
+                                                   hipStream_t                 stream) const;
 
         template <bool T_Debug>
         KernelInvocation generateBetaOnlyCall(Problem const&           problem,
@@ -339,6 +351,7 @@ namespace Tensile
             bool                  useInitialStridesCD     = false;
             bool                  stridedBatched          = true;
             bool                  groupedGemm             = false;
+            bool                  b2bGemm                 = false;
             bool                  fp16AltImpl             = false;
             ActivationType        activationType          = ActivationType::None;
             bool                  activationHPA           = false;

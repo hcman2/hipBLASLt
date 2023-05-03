@@ -588,6 +588,16 @@ namespace Tensile
             return m_groupedGemm;
         }
 
+        void setB2BGemm(bool value)
+        {
+            m_b2bGemm = value;
+        }
+
+        bool b2bGemm() const
+        {
+            return m_b2bGemm;
+        }
+
         void setHighPrecisionAccumulate(bool value)
         {
             m_highPrecisionAccumulate = value;
@@ -865,6 +875,7 @@ namespace Tensile
         bool           m_cEqualsD                = false;
         bool           m_stridedBatched          = true;
         bool           m_groupedGemm             = false;
+        bool           m_b2bGemm                 = false;
         bool           m_highPrecisionAccumulate = false;
         bool           m_deterministicMode       = false;
         bool           m_eligibleForPK           = true;
@@ -946,6 +957,23 @@ namespace Tensile
         {
             throw std::runtime_error("Get the information from gemms[idx].constants() instead.");
         }
+    };
+
+    class ContractionProblemB2BGemm : public ContractionProblem
+    {
+    public:
+        ContractionProblemB2BGemm()
+            : ContractionProblem(0){};
+        std::vector<ContractionProblemGemm> gemms;
+        virtual std::string                 description() const
+        {
+            throw std::runtime_error("Get the information from gemms[idx].description() instead.");
+        }
+        virtual std::vector<ConstantDescriptor> const constants() const
+        {
+            throw std::runtime_error("Get the information from gemms[idx].constants() instead.");
+        }
+
     };
 
     struct TENSILE_API ContractionInputs : public ProblemInputs

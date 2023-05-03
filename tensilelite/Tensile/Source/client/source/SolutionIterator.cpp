@@ -122,6 +122,14 @@ namespace Tensile
                         return false;
                 }
             }
+            else if(auto problems = dynamic_cast<ContractionProblemB2BGemm*>(m_problem))
+            {
+                for(int idx = 0; idx < problems->gemms.size(); idx++)
+                {
+                    if(!checkSolution(solution, problems->gemms[idx]))
+                        return false;
+                }
+            }
             else if(auto problem = dynamic_cast<ContractionProblemGemm*>(m_problem))
             {
                 return checkSolution(solution, *problem);
@@ -239,6 +247,11 @@ namespace Tensile
                     if(!criterion(problem->gemms[0], *m_hardware, *solution))
                         return false;
                 }
+                else if(auto problem = dynamic_cast<ContractionProblemB2BGemm*>(m_problem))
+                {
+                    if(!criterion(problem->gemms[0], *m_hardware, *solution))
+                        return false;
+                }
                 else if(auto problem = dynamic_cast<ContractionProblemGemm*>(m_problem))
                 {
                     if(!criterion(*problem, *m_hardware, *solution))
@@ -268,6 +281,11 @@ namespace Tensile
             {
                 m_currentSolution
                     = m_library->findBestSolution(groupedProblem->gemms[0], *m_hardware);
+            }
+            else if(auto b2bProblem = dynamic_cast<const ContractionProblemB2BGemm*>(problem))
+            {
+                m_currentSolution
+                    = m_library->findBestSolution(b2bProblem->gemms[0], *m_hardware);
             }
             else if(auto gemmProblem = dynamic_cast<const ContractionProblemGemm*>(problem))
             {
@@ -326,6 +344,11 @@ namespace Tensile
             {
                 m_solutions = m_library->findTopSolutionsGroupedGemm(
                     groupedProblem->gemms, *m_hardware, m_numSolutions);
+            }
+            else if(auto b2bProblem = dynamic_cast<const ContractionProblemB2BGemm*>(problem))
+            {
+                m_solutions = m_library->findTopSolutionsGroupedGemm(
+                    b2bProblem->gemms, *m_hardware, m_numSolutions);
             }
             else if(auto gemmProblem = dynamic_cast<const ContractionProblemGemm*>(problem))
             {
