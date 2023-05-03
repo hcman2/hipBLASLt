@@ -67,7 +67,7 @@ class ProblemType:
     StateKeys = ['operationIdentifier', 'aType', 'bType', 'cType', 'dType', 'eType',
                  'useBeta', 'useBias', 'biasSrcWhiteList', 'useE', 'useScaleD', 'biasDataTypeWhiteList', 'highPrecisionAccumulate',
                  'useInitialStridesAB', 'useInitialStridesCD', 'stridedBatched', 'groupedGemm',
-                 'useGradient', 'activationType', 'activationHPA', 'activationNoGuard']
+                 'b2bGemm', 'useGradient', 'activationType', 'activationHPA', 'activationNoGuard']
     @classmethod
     def FromOriginalState(cls, d):
         indices = [None]*d['TotalIndices']
@@ -153,6 +153,10 @@ class ProblemType:
         rv.groupedGemm = False
         if 'GroupedGemm' in d:
           rv.groupedGemm = d['GroupedGemm']
+
+        rv.b2bGemm = False
+        if 'B2BGemm' in d:
+          rv.b2bGemm = d['B2BGemm']
 
         rv.setConstStrideA = []
         if 'SetConstStrideA' in d:
@@ -320,6 +324,7 @@ class ProblemType:
             predicates.append(ProblemPredicate("UseE", value=self.useE))
             predicates.append(ProblemPredicate("StridedBatched", value=self.stridedBatched))
             predicates.append(ProblemPredicate("GroupedGemm", value=self.groupedGemm))
+            predicates.append(ProblemPredicate("B2BGemm", value=self.b2bGemm))
             predicates.append(ProblemPredicate("UseScaleD", value=self.useScaleD))
 
         return predicates
