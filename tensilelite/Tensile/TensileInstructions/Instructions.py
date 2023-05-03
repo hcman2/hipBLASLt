@@ -398,6 +398,7 @@ class ReadWriteInstruction(Instruction):
     def __init__(self, instType: InstType, rwType: RWType, comment="") -> None:
         super().__init__(instType, comment)
         self.rwType = rwType
+        self.appendDone = False
 
     def typeConvert(self) -> str:
         kStr = ""
@@ -432,7 +433,9 @@ class ReadWriteInstruction(Instruction):
 
     def preStr(self):
         # Local read is set in DSLoad and DSStore
-        self.instStr += self.typeConvert()
+        if self.appendDone == False:
+            self.instStr += self.typeConvert()
+            self.appendDone = True
 
     @abc.abstractmethod
     def toList(self) -> list:
@@ -2298,3 +2301,18 @@ class VPermB32(CommonInstruction):
     def __init__(self, dst, src0, src1, src2, comment="") -> None:
         super().__init__(InstType.INST_B32, dst, [src0, src1, src2], None, None, comment)
         self.setInst("v_perm_b32")
+# VNop
+class VNop(Instruction):
+    def __init__(self, comment="") -> None:
+        super().__init__(InstType.INST_NOTYPE, comment)
+        self.waitState = 1
+        self.setInst("v_nop")
+
+    def getParams(self) -> list:
+        return [self.waitState]
+
+    def toList(self) -> list:
+        return [self.instStr, self.waitState, self.comment]
+
+    def __str__(self) -> str:
+        return self.formatWithComment(self.instStr)

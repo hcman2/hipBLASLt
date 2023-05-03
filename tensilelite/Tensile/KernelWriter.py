@@ -2320,6 +2320,9 @@ class KernelWriter(metaclass=abc.ABCMeta):
       # NOT LocalSplitU
       ####################################
 
+      if kernel["ProblemType"]["B2BGemm"]:
+        module.add(self.b2bgemm(kernel, tensorParametersA, tensorParametersB))
+
       # global write indices
       module.addComment1("not-LocalSplitU: global write indices")
       module.add(self.notLocalSplitUGlobalWriteIndices(kernel))

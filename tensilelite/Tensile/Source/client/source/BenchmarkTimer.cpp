@@ -88,6 +88,10 @@ namespace Tensile
             {
                 pp = solution.projectedPerformance(problem->gemms[0], m_hardware);
             }
+            else if(auto problem = dynamic_cast<ContractionProblemB2BGemm*>(m_problem))
+            {
+                pp = solution.projectedPerformance(problem->gemms[0], m_hardware);
+            }
             else if(auto problem = dynamic_cast<ContractionProblemGemm*>(m_problem))
             {
                 pp = solution.projectedPerformance(*problem, m_hardware);
@@ -120,6 +124,11 @@ namespace Tensile
             ContractionSolution::ProjectedPerformance pp;
             double                                    flopCount = 0;
             if(auto problem = dynamic_cast<ContractionProblemGroupedGemm*>(m_problem))
+            {
+                pp        = m_solution.projectedPerformance(problem->gemms[0], m_hardware);
+                flopCount = problem->gemms[0].flopCount();
+            }
+            else if(auto problem = dynamic_cast<ContractionProblemB2BGemm*>(m_problem))
             {
                 pp        = m_solution.projectedPerformance(problem->gemms[0], m_hardware);
                 flopCount = problem->gemms[0].flopCount();
@@ -200,6 +209,12 @@ namespace Tensile
                 if(auto problem = dynamic_cast<ContractionProblemGroupedGemm*>(m_problem))
                 {
                     flopCount = problem->gemms[0].flopCount();
+                }
+                else if(auto problem = dynamic_cast<ContractionProblemB2BGemm*>(m_problem))
+                {
+                    double flopCount0 = problem->gemms[0].flopCount();
+                    double flopCount1 = problem->gemms[1].flopCount();
+                    flopCount = flopCount0 + flopCount1;
                 }
                 else if(auto problem = dynamic_cast<ContractionProblemGemm*>(m_problem))
                 {

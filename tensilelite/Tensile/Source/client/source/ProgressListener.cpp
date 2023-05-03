@@ -98,6 +98,14 @@ namespace Tensile
                     sizes.push_back(it.problemSizes());
                 m_reporter->report(ResultKey::ProblemSizes, sizes);
             }
+            else if(auto b2bProblem = dynamic_cast<const ContractionProblemB2BGemm*>(problem))
+            {
+                writeReport(b2bProblem->gemms[0]);
+                std::vector<std::vector<size_t>> sizes;
+                for(auto& it : b2bProblem->gemms)
+                    sizes.push_back(it.problemSizes());
+                m_reporter->report(ResultKey::ProblemSizes, sizes);
+            }
             else if(auto gemmProblem = dynamic_cast<const ContractionProblemGemm*>(problem))
             {
                 writeReport(*gemmProblem);

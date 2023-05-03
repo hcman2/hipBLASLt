@@ -264,6 +264,8 @@ class KernelWriterBetaOnly(KernelWriterBase):
     name += self.state["ProblemType"]["DestDataType"].toChar()
     if self.state["ProblemType"]["GroupedGemm"]:
       name += "_GG"
+    elif self.state["ProblemType"]["B2BGemm"]:
+      name += "_B2BG"
     else:
       name += "" if self.state["ProblemType"]["StridedBatched"] else "_GB"
     name += "_Bias%s"%self.state["ProblemType"]["BiasDataType"].toChar() if self.state["ProblemType"]["BetaOnlyUseBias"] else ""

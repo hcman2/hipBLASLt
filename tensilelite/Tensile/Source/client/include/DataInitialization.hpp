@@ -137,6 +137,11 @@ namespace Tensile
                 {
                     return prepareCPUInputs(groupedProblem->gemms[0]);
                 }
+                else if(auto b2bProblem
+                   = dynamic_cast<ContractionProblemB2BGemm const*>(problem))
+                {
+                    return prepareCPUInputs(b2bProblem->gemms[0]);
+                }
                 else if(auto gemmProblem = dynamic_cast<ContractionProblemGemm const*>(problem))
                 {
                     return prepareCPUInputs(*gemmProblem);
@@ -191,6 +196,11 @@ namespace Tensile
                    = dynamic_cast<ContractionProblemGroupedGemm const*>(problem))
                 {
                     return prepareGPUInputs(groupedProblem->gemms[0]);
+                }
+                else if(auto b2bProblem
+                   = dynamic_cast<ContractionProblemB2BGemm const*>(problem))
+                {
+                    return prepareGPUInputs(b2bProblem->gemms[0]);
                 }
                 else if(auto gemmProblem = dynamic_cast<ContractionProblemGemm const*>(problem))
                 {
