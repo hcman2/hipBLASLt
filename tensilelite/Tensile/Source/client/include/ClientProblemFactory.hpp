@@ -72,6 +72,7 @@ namespace Tensile
 
             bool m_stridedBatched;
             bool m_groupedGemm;
+            bool m_b2bGemm;
             bool m_highPrecisionAccumulate;
             bool m_deterministicMode;
             bool m_cEqualsD;

@@ -145,6 +145,12 @@ class SignatureCOV3(Signature):
             if kernel["ProblemType"]["ActivationType"] == 'all':
                 signature.addArg(       "activationType", SVK.SIG_VALUE,               "u32")
 
+        if kernel["ProblemType"]["B2BGemm"]:
+            signature.addArg("sizeB1", SVK.SIG_VALUE, "u64")
+            signature.addArg("strideB10", SVK.SIG_VALUE, "u32")
+            signature.addArg("strideB11", SVK.SIG_VALUE, "u32")
+            signature.addArg("B1", SVK.SIG_GLOBALBUFFER, "generic")
+
         self.addOptConfigComment(signature,
                                 tt=[kernel["ThreadTile0"], kernel["ThreadTile1"]],
                                 sg=[kernel["SubGroup0"], kernel["SubGroup1"]],

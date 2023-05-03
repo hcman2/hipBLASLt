@@ -292,11 +292,18 @@ namespace Tensile
                                        hipStream_t                 stream) const;
 
         virtual void relaseDeviceUserArgs(void* dUA, void* dUAHost);
+        virtual std::vector<KernelInvocation> solveB2BGemm(std::vector<Problem> const& problems,
+                                                           GroupedInputs const&        inputs,
+                                                           Hardware const&             hardware,
+                                                           void*       hipHostMemory,
+                                                           size_t      hipHostMemorySize,
+                                                           hipStream_t stream) const;
 
         template <bool T_Debug, typename KA>
         void singleCallArgs(Problem const&           problem,
                             ContractionInputs const& inputs,
                             uint32_t const&          workspaceOffsetInByte,
+                            bool const&              isB2BGemm,
                             KA&                      args) const;
 
         template <typename KA>
@@ -315,6 +322,12 @@ namespace Tensile
                                                        GroupedInputs const&        inputs,
                                                        KA&                         h_args,
                                                        void const* userArgs = nullptr) const;
+
+        template <bool T_Debug>
+        KernelInvocation generateSingleCallB2BGemm(std::vector<Problem> const& problems,
+                                                   GroupedInputs const&        inputs,
+                                                   Hardware const&             hardware,
+                                                   hipStream_t                 stream) const;
 
         template <bool T_Debug>
         KernelInvocation generateBetaOnlyCall(Problem const&           problem,
@@ -429,6 +442,7 @@ namespace Tensile
             bool                  useInitialStridesCD       = false;
             bool                  stridedBatched            = true;
             bool                  groupedGemm               = false;
+            bool                  b2bGemm                 = false;
             bool                  fp16AltImpl               = false;
             ActivationType        activationType            = ActivationType::None;
             int                   activationArgLength       = 0;

@@ -1100,6 +1100,7 @@ defaultProblemType = {
     "Batched":                  False,            # add batching dimension
     "StridedBatched":           True,             # use to select general batch or strided batch
     "GroupedGemm":              False,             # use to select general batch or strided batch
+    "B2BGemm":                  False,            # use to select back-to-back GEMM
 
     # for OperationType == TensorContraction
     # - Indices < NumIndicesC are Free or Batch indices and appear in C and D

@@ -66,7 +66,7 @@ class BoundIndex:
 class ProblemType:
     StateKeys = ['operationIdentifier', 'transA', 'transB', 'aType', 'bType', 'cType', 'dType', 'eType', 'computeType',
                  'useBeta', 'useBias', 'biasSrcWhiteList', 'useE', 'useScaleDVec', 'biasDataTypeWhiteList', 'highPrecisionAccumulate',
-                 'useInitialStridesAB', 'useInitialStridesCD', 'stridedBatched', 'groupedGemm',
+                 'useInitialStridesAB', 'useInitialStridesCD', 'stridedBatched', 'groupedGemm', 'b2bGemm',
                  'useGradient', 'activationType', 'activationArgLength', 'activationComputeDataType', 'activationNoGuard',
                  'sparseA', 'f32XdlMathOp', 'supportDeviceUserArguments']
     @classmethod
@@ -157,6 +157,10 @@ class ProblemType:
         rv.groupedGemm = False
         if 'GroupedGemm' in d:
           rv.groupedGemm = d['GroupedGemm']
+
+        rv.b2bGemm = False
+        if 'B2BGemm' in d:
+          rv.b2bGemm = d['B2BGemm']
 
         rv.setConstStrideA = []
         if 'SetConstStrideA' in d:
@@ -336,6 +340,7 @@ class ProblemType:
             predicates.append(ProblemPredicate("SparseA", value=self.sparseA))
             predicates.append(ProblemPredicate("F32XdlMathOp", value=self.f32XdlMathOp))
             predicates.append(ProblemPredicate("SupportDeviceUserArguments", value=self.supportDeviceUserArguments))
+            predicates.append(ProblemPredicate("B2BGemm", value=self.b2bGemm))
 
         return predicates
 

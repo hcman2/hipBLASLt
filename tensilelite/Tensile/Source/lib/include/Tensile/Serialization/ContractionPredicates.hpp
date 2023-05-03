@@ -92,6 +92,7 @@ namespace Tensile
                     Base::template Pair<Predicates::Contraction::CDStridesEqual>(),
                     Base::template Pair<Predicates::Contraction::StridedBatchedEqual>(),
                     Base::template Pair<Predicates::Contraction::GroupedGemmEqual>(),
+                    Base::template Pair<Predicates::Contraction::B2BGemmEqual>(),
                     Base::template Pair<Predicates::Contraction::CUEfficiency>(),
                     Base::template Pair<Predicates::Contraction::Experimental>(),
                     Base::template Pair<Predicates::Contraction::Fp16AltImpl>(),
@@ -341,6 +342,12 @@ namespace Tensile
         template <typename IO>
         struct MappingTraits<Predicates::Contraction::GroupedGemmEqual, IO>
             : public AutoMappingTraits<Predicates::Contraction::GroupedGemmEqual, IO>
+        {
+        };
+
+        template <typename IO>
+        struct MappingTraits<Predicates::Contraction::B2BGemmEqual, IO>
+            : public AutoMappingTraits<Predicates::Contraction::B2BGemmEqual, IO>
         {
         };
 

@@ -119,6 +119,9 @@ namespace Tensile
             static void SolveCPU(ContractionProblemGroupedGemm const& contractions,
                                  ContractionGroupedInputs const&      inputs,
                                  size_t                               elementsToValidate);
+            static void SolveCPU(ContractionProblemB2BGemm const& contractions,
+                                 ContractionGroupedInputs const&  inputs,
+                                 size_t                           elementsToValidate);
         };
 
         void SolveCPU(ContractionProblem const* contraction,
