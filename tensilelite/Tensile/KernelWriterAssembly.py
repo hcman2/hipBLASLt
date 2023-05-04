@@ -8746,21 +8746,26 @@ class KernelWriterAssembly(KernelWriter):
       module.add(VAccvgprWrite(accvgpr(i), hex(0)))
     return module
 
-  def b2bgemmSetupGlobalReadAddressB1(self, kernel, tPB) -> Module:
+  def b2bgemmSetupGlobalReadAddressB1(self, kernel, tPB) -> Tuple[Module, int, int]:
     module = Module("B2B GEMM Global Read Addr")
     #TODO: remove, temp use getOffset here
     b1KernelArgOffset = self.argLoader.getOffset()
+    sgprStridesB = self.sgprPool.checkOutAligned(6, 2)
+    sgprAddressB = sgprStridesB + 2
+    sgprTensor2dSizeB = sgprAddressB + 2
+    sgprSrdB = self.sgprPool.checkOutAligned(4, 4)
+    
     module.addComment("B2BGemm setup B1 address")
-    module.add(SLoadB64(sgpr('Tensor2dSizeB', 2), sgpr('KernArgAddress', 2), hex(b1KernelArgOffset)))
-    module.add(SLoadB64(sgpr('StridesB', 2), sgpr('KernArgAddress', 2), hex(b1KernelArgOffset + 8)))
-    module.add(SLoadB64(sgpr('AddressB', 2), sgpr('KernArgAddress', 2), hex(b1KernelArgOffset + 16)))
+    module.add(SLoadB64(sgpr(sgprTensor2dSizeB, 2), sgpr('KernArgAddress', 2), hex(b1KernelArgOffset)))
+    module.add(SLoadB64(sgpr(sgprStridesB, 2), sgpr('KernArgAddress', 2), hex(b1KernelArgOffset + 8)))
+    module.add(SLoadB64(sgpr(sgprAddressB, 2), sgpr('KernArgAddress', 2), hex(b1KernelArgOffset + 16)))
     module.add(SWaitCnt(lgkmcnt=0))
-    module.add(SMovB64(sgpr('SrdB', 2), sgpr('AddressB', 2)))
+    module.add(SMovB64(sgpr(sgprSrdB, 2), sgpr(sgprAddressB, 2)))
     numElements = kernel['MacroTile1'] ** 2
     numElements *= tPB["bpe"]
-    module.add(SMovB32(sgpr('SrdB+2'), hex(numElements)))
-    module.add(SMovB32(sgpr('SrdB+3'), 'Srd127_96'))
-    return module
+    module.add(SMovB32(sgpr(sgprSrdB + 2), hex(numElements)))
+    module.add(SMovB32(sgpr(sgprSrdB + 3), 'Srd127_96'))
+    return module, sgprStridesB, sgprSrdB
 
   def b2bgemmSetupLocalReadAddressA1(self, kernel, tPA) -> Module:
     mod = Module()
@@ -8819,7 +8824,7 @@ class KernelWriterAssembly(KernelWriter):
       self.vgprPool.checkIn(tid)
       return module, coord0
 
-  def b2bgemmCalculateGlobalReadBInitialIndex(self, kernel, waveGroupM, wavelen, instN, instK, instB, instBN) -> Tuple[Module, int, int]:
+  def b2bgemmCalculateGlobalReadBInitialIndex(self, kernel, waveGroupM, wavelen, instN, instK, instB, instBN, sgprStrideB: int) -> Tuple[Module, int, int]:
       '''
       tid = serial % wavelen         ; 0...63
       wid = serial // wavelen        ; 0...3
@@ -8860,7 +8865,7 @@ class KernelWriterAssembly(KernelWriter):
       module.add(VAddU32(vgpr(coord1), vgpr(vIdx), vgpr(coord1)))
       module.addComment("Apply stride to the column shift")
       module.add(staticMultiply(vgpr(coord1), vgpr(coord1), elemNumBytes, None))
-      module.add(VMulLOU32(vgpr(coord1), vgpr(coord1), sgpr("StridesB", 1), None))
+      module.add(VMulLOU32(vgpr(coord1), vgpr(coord1), sgpr(sgprStrideB, 1), None))
       # apply row shift by using numVector here
       module.addComment("Calculate row shift here (depend on MI type)")
       module.add(vectorStaticRemainder(None, vIdx, tid, numThdPerInst, None, None))
@@ -8876,7 +8881,7 @@ class KernelWriterAssembly(KernelWriter):
       sgprStrideBOffset = 0
       if waveTileN > 1:
         sgprStrideBOffset = self.sgprPool.checkOut(waveTileN - 1)
-        module.add(SMulI32(dst=sgpr(sgprStrideBOffset), src0=sgpr('StridesB'), src1=strideN * elemNumBytes, comment="Calculate waveTileOffsetBytes"))
+        module.add(SMulI32(dst=sgpr(sgprStrideBOffset), src0=sgpr(sgprStrideB), src1=strideN * elemNumBytes, comment="Calculate waveTileOffsetBytes"))
         for i in range(2, waveTileN):
           module.add(SAddI32(dst=sgpr(sgprStrideBOffset+i-1), src0=sgpr(sgprStrideBOffset+i-2), src1=sgpr(sgprStrideBOffset)))
       self.vgprPool.checkIn(tid)
@@ -9042,7 +9047,7 @@ class KernelWriterAssembly(KernelWriter):
   def b2bgemmCalcInputVgprIdx(self, baseVgprIdx, vectorWidth, tileIdx) -> int:
     return baseVgprIdx + vectorWidth * tileIdx
 
-  def b2bgemmGlobalReadB1(self, kernel, addrVgprIdx, kIdx: int, sgprScalarOffset, vgprReadIncIdx: int) -> Tuple[Module, Module, int, int]:
+  def b2bgemmGlobalReadB1(self, kernel, addrVgprIdx, kIdx: int, sgprScalarOffset, vgprReadIncIdx: int, sgprSrdB: int) -> Tuple[Module, Module, int, int]:
     '''
     Iteration direction example for # of waves == 4 and wave tile = [1, 1]
     /-------- MT1 == N1 --------\
@@ -9076,11 +9081,11 @@ class KernelWriterAssembly(KernelWriter):
       # The global read value will not exceed 1024 bytes, so we can use offset slot
       if wn == 0:
         #module.add(self.chooseGlobalRead(True, numBytesPerVectorLoad, vgprIdx, vgpr(addrVgprIdx), sgpr("SrdB", 4), 0, kIdx * strideM * elemNumBytes))
-        module.add(self.chooseGlobalRead(True, numBytesPerVectorLoad, vgprIdx, vgpr(addrVgprIdx), sgpr("SrdB", 4), 0, 0))
+        module.add(self.chooseGlobalRead(True, numBytesPerVectorLoad, vgprIdx, vgpr(addrVgprIdx), sgpr(sgprSrdB, 4), 0, 0))
       else:
         #need to shift waveTileOffsetBytes
         #module.add(self.chooseGlobalRead(True, numBytesPerVectorLoad, vgprIdx, vgpr(addrVgprIdx), sgpr("SrdB", 4), sgpr(sgprScalarOffset + wn - 1), kIdx * strideM * elemNumBytes))
-        module.add(self.chooseGlobalRead(True, numBytesPerVectorLoad, vgprIdx, vgpr(addrVgprIdx), sgpr("SrdB", 4), sgpr(sgprScalarOffset + wn - 1), 0))
+        module.add(self.chooseGlobalRead(True, numBytesPerVectorLoad, vgprIdx, vgpr(addrVgprIdx), sgpr(sgprSrdB, 4), sgpr(sgprScalarOffset + wn - 1), 0))
       #self.vgprPool.checkIn(readByteOffsetVgpr)
 
     # GR inc
@@ -9477,9 +9482,10 @@ class KernelWriterAssembly(KernelWriter):
 
 
     module.add(Label("b2bg_start",""))
-    module.add(self.b2bgemmSetupGlobalReadAddressB1(dupKernel, tPB))
+    loadB1ArgCode, sgprStridesB, sgprSrdB = self.b2bgemmSetupGlobalReadAddressB1(dupKernel, tPB)
+    module.add(loadB1ArgCode)
     lraSetupCode, lraAddrRowVgprIdx = self.b2bgemmCalculateLocalReadAInitialIndex(dupKernel, waveGroupM, wavelen, instM, instK, instB, BM)
-    lrbSetupCode, lrbAddrVgprIdx, sgprScalarOffset = self.b2bgemmCalculateGlobalReadBInitialIndex(dupKernel, waveGroupM, wavelen, instN, instK, instB, BN)
+    lrbSetupCode, lrbAddrVgprIdx, sgprScalarOffset = self.b2bgemmCalculateGlobalReadBInitialIndex(dupKernel, waveGroupM, wavelen, instN, instK, instB, BN, sgprStridesB)
     module.add(lraSetupCode)
     module.add(lrbSetupCode)
 
@@ -9487,7 +9493,7 @@ class KernelWriterAssembly(KernelWriter):
     prefetchGRCode = Module()
     localWriteA1Code = Module()
     for i in range(b2bgemmPrefetchGlobalRead):
-      self.b2bGRCode, grIncCode, bVgprPrefetch[i], bNumVgprs = self.b2bgemmGlobalReadB1(dupKernel, lrbAddrVgprIdx, i * miK, sgprScalarOffset, vgprReadIncIdx)
+      self.b2bGRCode, grIncCode, bVgprPrefetch[i], bNumVgprs = self.b2bgemmGlobalReadB1(dupKernel, lrbAddrVgprIdx, i * miK, sgprScalarOffset, vgprReadIncIdx, sgprSrdB)
       prefetchGRCode.add(self.b2bGRCode)
       prefetchGRCode.add(grIncCode)
 
@@ -9538,7 +9544,7 @@ class KernelWriterAssembly(KernelWriter):
       pckCode = Module()
       if i < (numIters - b2bgemmPrefetchGlobalRead):
         self.b2bGRCode, grIncCode, bVgprPrefetch[i + b2bgemmPrefetchGlobalRead], bNumVgprs \
-          = self.b2bgemmGlobalReadB1(dupKernel, lrbAddrVgprIdx, (i + b2bgemmPrefetchGlobalRead) * miK, sgprScalarOffset, vgprReadIncIdx)
+          = self.b2bgemmGlobalReadB1(dupKernel, lrbAddrVgprIdx, (i + b2bgemmPrefetchGlobalRead) * miK, sgprScalarOffset, vgprReadIncIdx, sgprSrdB)
       else:
         self.b2bGRCode = Module()
         #grIncCode = Module()
@@ -9601,6 +9607,8 @@ class KernelWriterAssembly(KernelWriter):
       self.sgprPool.checkIn(loopCounterSgpr)
 
     module.add(tailLoopCode)
+    self.sgprPool.checkIn(sgprSrdB)
+    self.sgprPool.checkIn(sgprStridesB)
     self.vgprPool.checkIn(vgprReadIncIdx)
     self.vgprPool.checkIn(lraAddrRowVgprIdx)
     self.vgprPool.checkIn(lrbAddrVgprIdx)
