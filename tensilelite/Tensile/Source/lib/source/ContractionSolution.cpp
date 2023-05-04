@@ -1471,6 +1471,12 @@ namespace Tensile
             auto  groupedInputs = dynamic_cast<ContractionGroupedInputs const*>(&inputs);
             return solveGroupedGemm(gemms, (*groupedInputs), hardware, stream);
         }
+        else if(auto b2bProblem = dynamic_cast<ContractionProblemB2BGemm const*>(&problem))
+        {
+            auto& gemms = b2bProblem->gemms;
+            auto gemmInputs = dynamic_cast<ContractionGroupedInputs const*>(&inputs);
+            return solveB2BGemm(gemms, (*gemmInputs), hardware, stream);
+        }
         else
         {
             throw std::runtime_error("Failed to cast problem type.");
