@@ -201,8 +201,6 @@ class ComputeStoreVgprsMFMASwap(ComputeStoreVgprs):
             module.add(vectorStaticDivide(tid1, tid1, matrixInstM, tmpVgpr1Res))
             module.add(staticMultiply(vgpr(tid1), vgpr(tid1), kernel["MIOutputVectorWidth"], tmpSgprInfo, "thread0 * continuous_output"))
             module.add(VAddU32(dst=vgpr(tid1), src0=vgpr(tmpVgpr0), src1=vgpr(tid1), comment="coordination 1 = wave_id1 + tid1"))
-            if kernel["allowLRVWforTLUandMI"] and writer.states.lrvwB > 1:
-                module.add(staticMultiply(vgpr(tid1), vgpr(tid1), writer.states.lrvwB, tmpSgprInfo, "coordination 1 *= lrvwB"))
 
             # coord 1 : offset part
             packedC1 = kernel["PackedC1IndicesX"]

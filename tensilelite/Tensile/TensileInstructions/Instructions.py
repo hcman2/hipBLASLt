@@ -2205,3 +2205,8 @@ class VRndneF32(CommonInstruction):
     def __init__(self, dst, src, comment="") -> None:
         super().__init__(InstType.INST_F32, dst, [src], None, None, comment)
         self.setInst("v_rndne_f32")
+
+class VPermB32(CommonInstruction):
+    def __init__(self, dst, src0, src1, src2, comment="") -> None:
+        super().__init__(InstType.INST_B32, dst, [src0, src1, src2], None, None, comment)
+        self.setInst("v_perm_b32")

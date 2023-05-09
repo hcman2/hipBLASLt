@@ -272,7 +272,7 @@ class StoreState:
     #
     # Also create an AddrCalc for each memory operation.
     ##############################################################################
-    def setupStoreElementsForBatch(self, kernel, gwvw, batchElements, batchElementSgprs, isOptNLL, allowLRVWforTLUandMI, lrvwB):
+    def setupStoreElementsForBatch(self, kernel, gwvw, batchElements, batchElementSgprs, isOptNLL):
 
         self.elementAddr     = []
         self.elementDataE    = []
@@ -311,7 +311,6 @@ class StoreState:
 
             coordOffset1 = 0
             if kernel["EnableMatrixInstruction"]:
-                vc1Scale = lrvwB if allowLRVWforTLUandMI else 1
                 MIOutputVectorWidth = kernel["MIOutputVectorWidth"]
                 MFMAContinuousOutputs = MIOutputVectorWidth if kernel["SourceSwap"] else 1
                 OutputsPerMIMN        = (matrixInstM * matrixInstN // self.kernel["WavefrontSize"]) if kernel["SourceSwap"] else 1
@@ -326,7 +325,7 @@ class StoreState:
                 coordOffset1  = eIdx1 * (self.kernel["WavefrontSize"] // matrixInstN) * MFMAContinuousOutputs
                 coordOffset1 += bIdx1 * matrixInstN
                 coordOffset1 += wtIdex * matrixInstN *  matrixInstBN * kernel["MIWaveGroup"][1]
-                coordOffset1 = coordOffset1 * vc1Scale + vc1
+                coordOffset1 = coordOffset1 + vc1
             else:
                 if kernel["LocalSplitU"] > 1:
                     strideD1 = (kernel["NumThreads"]*kernel["VectorWidth"]//kernel["MacroTile0"])

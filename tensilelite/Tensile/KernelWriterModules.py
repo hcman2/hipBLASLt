@@ -123,7 +123,7 @@ def syncThreads(kernel, archCaps, comment=""):
                 comment)
     return imod
 
-def _getAccToArchInfo(kernel, lrvwB):
+def _getAccToArchInfo(kernel):
   matrixInstM  = (kernel["MatrixInstM"] * kernel["MatrixInstBM"]) if (kernel["MatrixInstM"] == 4) else kernel["MatrixInstM"]
   matrixInstN  = (kernel["MatrixInstN"] * kernel["MatrixInstBN"]) if (kernel["MatrixInstN"] == 4) else kernel["MatrixInstN"]
   matrixInstBM = 1                                                if (kernel["MatrixInstM"] == 4) else kernel["MatrixInstBM"]
@@ -132,14 +132,13 @@ def _getAccToArchInfo(kernel, lrvwB):
   OutputsPerMFMA1B = matrixInstM * matrixInstN // kernel["WavefrontSize"]
   VectorWidth0     = kernel["VectorWidth"] if kernel["SourceSwap"] else 1
   outerTT0         = kernel["MIWaveTile"][0] // VectorWidth0
-  lrvwB            = lrvwB if kernel["allowLRVWforTLUandMI"] else 1
-  VectorWidth1     = lrvwB
+  VectorWidth1     = 1
   outerTT1         = kernel["MIWaveTile"][1] // VectorWidth1
-  return matrixInstBM, matrixInstBN, OutputsPerMFMA1B, VectorWidth0, outerTT0, lrvwB, outerTT1
+  return matrixInstBM, matrixInstBN, OutputsPerMFMA1B, VectorWidth0, outerTT0, outerTT1
 
-def getAccToArchLen(kernel, lrvwB):
-  matrixInstBM, matrixInstBN, OutputsPerMFMA1B, VectorWidth0, outerTT0, lrvwB, outerTT1 = _getAccToArchInfo(kernel, lrvwB)
-  return (outerTT1 * lrvwB *  outerTT0 * matrixInstBN * matrixInstBM * OutputsPerMFMA1B * VectorWidth0)
+def getAccToArchLen(kernel):
+  matrixInstBM, matrixInstBN, OutputsPerMFMA1B, VectorWidth0, outerTT0, outerTT1 = _getAccToArchInfo(kernel)
+  return (outerTT1  *  outerTT0 * matrixInstBN * matrixInstBM * OutputsPerMFMA1B * VectorWidth0)
 
 ##############################################################################
 # accToArchMapper
@@ -148,45 +147,44 @@ def getAccToArchLen(kernel, lrvwB):
 #  - Backward transformation is used in ShiftVectorComponent() to map logical
 #    C-tile index back to original acc index
 ##############################################################################
-def accToArchMapper(kernel, lrvwB):
+def accToArchMapper(kernel):
   acc2arch = dict()
   arch2acc = dict()
 
-  matrixInstBM, matrixInstBN, OutputsPerMFMA1B, VectorWidth0, outerTT0, lrvwB, outerTT1 = _getAccToArchInfo(kernel, lrvwB)
+  matrixInstBM, matrixInstBN, OutputsPerMFMA1B, VectorWidth0, outerTT0, outerTT1 = _getAccToArchInfo(kernel)
 
   for wgIdx1 in range(0, outerTT1):
-    for lb in range(0, lrvwB):
-      for wgIdx0 in range(0, outerTT0):
-        for bIdx1 in range(0, matrixInstBN):
-          for bIdx0 in range(0, matrixInstBM):
-            for tIdx in range(0, OutputsPerMFMA1B):
-              for vw0 in range(0, VectorWidth0):
-                src, dst = 0, 0
-                if kernel["SourceSwap"]:
-                  src = tIdx + OutputsPerMFMA1B * (bIdx0 + matrixInstBM * (bIdx1 + matrixInstBN * (vw0 + VectorWidth0 * (wgIdx0 + outerTT0 * (wgIdx1 * lrvwB + lb)))))
-                  dst = vw0 + VectorWidth0 * ((bIdx0 + matrixInstBM * (wgIdx0 + outerTT0 * ((tIdx + OutputsPerMFMA1B * (bIdx1 + matrixInstBN * wgIdx1)) * lrvwB + lb))))
-                else:
-                  src = tIdx + OutputsPerMFMA1B * (bIdx1 + matrixInstBN * (bIdx0 + matrixInstBM * (wgIdx0 + outerTT0 * wgIdx1)))
-                  dst = tIdx + OutputsPerMFMA1B * (bIdx0 + matrixInstBM * (wgIdx0 + outerTT0 * (bIdx1 + matrixInstBN * wgIdx1)))
-                acc2arch[src] = dst
-                arch2acc[dst] = src
+    for wgIdx0 in range(0, outerTT0):
+      for bIdx1 in range(0, matrixInstBN):
+        for bIdx0 in range(0, matrixInstBM):
+          for tIdx in range(0, OutputsPerMFMA1B):
+            for vw0 in range(0, VectorWidth0):
+              src, dst = 0, 0
+              if kernel["SourceSwap"]:
+                src = tIdx + OutputsPerMFMA1B * (bIdx0 + matrixInstBM * (bIdx1 + matrixInstBN * (vw0 + VectorWidth0 * (wgIdx0 + outerTT0 * wgIdx1))))
+                dst = vw0 + VectorWidth0 * (bIdx0 + matrixInstBM * (wgIdx0 + outerTT0 * ((tIdx + OutputsPerMFMA1B * (bIdx1 + matrixInstBN * wgIdx1)))))
+              else:
+                src = tIdx + OutputsPerMFMA1B * (bIdx1 + matrixInstBN * (bIdx0 + matrixInstBM * (wgIdx0 + outerTT0 * wgIdx1)))
+                dst = tIdx + OutputsPerMFMA1B * (bIdx0 + matrixInstBM * (wgIdx0 + outerTT0 * (bIdx1 + matrixInstBN * wgIdx1)))
+              acc2arch[src] = dst
+              arch2acc[dst] = src
   return acc2arch, arch2acc
 
-def accVgprImagNumOffset(kernel, lrvwB):
-  acc2arch, _ = accToArchMapper(kernel, lrvwB)
+def accVgprImagNumOffset(kernel):
+  acc2arch, _ = accToArchMapper(kernel)
   return len(acc2arch) * kernel["MIRegPerOut"]
 
 ##############################################################################
 # MapAcctoArch
 # function to map MFMA Acc  Registers to Arch VGPR register
 ##############################################################################
-def mapAcctoArchRegs(kernel, lrvwB):
-  acc2arch, _ = accToArchMapper(kernel, lrvwB)
+def mapAcctoArchRegs(kernel):
+  acc2arch, _ = accToArchMapper(kernel)
 
   complexMultiplier = 2 if kernel["ProblemType"]["DataType"].isComplex() else 1
   imod = Module("AccVgprRead")
   imod.itemList = [None] * kernel["MIRegPerOut"] * complexMultiplier * len(acc2arch)
-  accImOffset = accVgprImagNumOffset(kernel, lrvwB)
+  accImOffset = accVgprImagNumOffset(kernel)
   for i in range(len(acc2arch)):
     for cm in range(complexMultiplier):
       for r in range(kernel["MIRegPerOut"]):
@@ -207,8 +205,8 @@ def mapAcctoArchRegs(kernel, lrvwB):
 # MulMIoutAlphaToArch
 # function to handle MFMA alpha*MIout to Arch VGPR register
 ##############################################################################
-def mulMIoutAlphaToArch(kernel, lrvwB, startVgprAlphaTmp):
-  acc2arch, _ = accToArchMapper(kernel, lrvwB)
+def mulMIoutAlphaToArch(kernel, startVgprAlphaTmp):
+  acc2arch, _ = accToArchMapper(kernel)
 
   imod = Module("MulAlpha")
   imod.itemList = [None] * len(acc2arch)
@@ -229,7 +227,7 @@ def mulMIoutAlphaToArch(kernel, lrvwB, startVgprAlphaTmp):
                                                       src0=sgpr("Alpha"), src1=vgpr("ValuC+%u"%srcIdx),
                                                        comment="Multiply MI out reg with alpha")
     elif kernel["ProblemType"]["ComputeDataType"].isDoubleComplex():
-      accImOffset = accVgprImagNumOffset(kernel, lrvwB)
+      accImOffset = accVgprImagNumOffset(kernel)
       cimod = Module()
       # cannot use tmp vgpr for write batch, use allocated vgpr instead
       vtmp1 = startVgprAlphaTmp

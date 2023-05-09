@@ -2110,6 +2110,9 @@ class Solution(collections.abc.Mapping):
             or state["ThreadTile1"] % state["VectorWidth"] != 0:
           state["VectorWidth"] //= 2
 
+    if state["EnableMatrixInstruction"] and not state["SourceSwap"] and state["VectorWidth"] > 1:
+      reject(state, "not implement VectorWidth without SourceSwap")
+
     # TT0,1 both must be multiples of VW, b/c of rC, rA, rB
     if state["EnableMatrixInstruction"]:
       if state["SourceSwap"] and ((state["MIWaveTile"][0] % state["VectorWidth"]) != 0):
@@ -2472,21 +2475,6 @@ class Solution(collections.abc.Mapping):
         totalVectorsCoalescedB, totalElementsPerpB):
       return
 
-    # allow LocalReadVectorWidth for TLU + MatrixInstruction
-    # so far, limited to double + (DTVB or (DTVA + no DTL)) only
-    # some more limitations necessary to make this logic work
-    # - SourceSwap
-    # - VectorWidth >= LocalReadVectorWidth
-    # - AssertFree1ElementMultiple % VectorWidth == 0 (no shift edge for B)
-    # - the other side of MIWaveTile must be multiple of VectorWidth
-    state["allowLRVWforTLUandMI"] = state["ProblemType"]["DataType"].isDouble() and \
-                                (state["DirectToVgprB"] or state["DirectToVgprA"] and not state["DirectToLds"]) and \
-                                state["EnableMatrixInstruction"] and state["ProblemType"]["TLUA"] and state["ProblemType"]["TLUB"] and \
-                                state["VectorWidth"] >= state["LocalReadVectorWidth"] and \
-                                state["AssertFree1ElementMultiple"] % state["VectorWidth"] == 0 and \
-                                ((state["DirectToVgprA"] and (state["MIWaveTile"][1] % state["VectorWidth"] == 0)) or \
-                                 (state["DirectToVgprB"] and (state["MIWaveTile"][0] % state["VectorWidth"] == 0)))
-
     # Determine if we can load directly-to-Vgpr
     if state["DirectToVgprA"]:
       if not Solution.isDirectToVgprDoable(state, 'A'):
@@ -2643,7 +2631,7 @@ class Solution(collections.abc.Mapping):
 
     # Default LocalReadVectorWidth
     if state["LocalReadVectorWidth"] == -1:
-      if state["EnableMatrixInstruction"] and not state["allowLRVWforTLUandMI"]:
+      if state["EnableMatrixInstruction"]:
         state["LocalReadVectorWidth"] = state["MIInputPerThread"]
         # enable less than state["MIInputPerThread"]
         # for fp64 this means ds_read_b32
@@ -2657,8 +2645,7 @@ class Solution(collections.abc.Mapping):
         # support LocalReadVectorWidth < miInputPerThread for directToLdsX2/X4
         if state["LocalReadVectorWidth"] < state["MIInputPerThread"] and not (state["DirectToLdsA"] or state["DirectToLdsB"]):
           reject(state, "LocalReadVectorWidth < %u" %(state["MIInputPerThread"]))
-        if state["LocalReadVectorWidth"] > state["MIInputPerThread"] and not state["TransposeLDS"] \
-           and not state["allowLRVWforTLUandMI"]:
+        if state["LocalReadVectorWidth"] > state["MIInputPerThread"] and not state["TransposeLDS"]:
           reject(state, "LocalReadVectorWidth require Transpose LDS")
       else:
         if state["LocalReadVectorWidth"] != state["VectorWidth"]:
@@ -2680,8 +2667,9 @@ class Solution(collections.abc.Mapping):
           state["LdsPadA"] = 0
           if state["MatrixInstB"] == 1 and state["MatrixInstM"] == 16:
             state["LdsPadA"] = ((16 * state["ProblemType"]["DataType"].numBytes() + (state["MatrixInstK"] // 4) * state["MacroTile0"] * state["ProblemType"]["DataType"].numBytes()) % 128) // state["ProblemType"]["DataType"].numBytes()
-          if state["SourceSwap"] and state["VectorWidth"] > 1:
-            pass
+            # ds_read_b128 will offset 16 bank per 16 thread
+            if state["SourceSwap"] and state["VectorWidth"] * state["ProblemType"]["DataType"].numBytes() == 16 and not state["ProblemType"]["DataType"].isDouble():
+              state["LdsPadA"] = ((16 * state["ProblemType"]["DataType"].numBytes() + (state["MatrixInstK"] // 4) * state["MacroTile0"] * state["ProblemType"]["DataType"].numBytes() + 64) % 128) // state["ProblemType"]["DataType"].numBytes()
         else:
           state["LdsPadA"] = 0
       else:
@@ -3215,10 +3203,6 @@ class Solution(collections.abc.Mapping):
 
     # Bias reduction
     if state["ProblemType"]["UseBias"] and state["ProblemType"]["Gradient"]:
-      if (state["ProblemType"]["BiasSrc"] == "A" or state["ProblemType"]["BiasSrc"] == "B"):
-        if state["allowLRVWforTLUandMI"]:
-          # Block for not verified.
-          reject(state, "Bias reduction on A, B does not support allowLRVWforTLUandMI")
       if (state["_GlobalAccumulation"] == 'SingleBuffer') and state["GlobalSplitU"] > 1:
         reject(state, "GlobalSplitU > 1 only compatible with MultipleBuffer for bias reduction")
       if len(state["PackedC1IndicesX"]) > 1:

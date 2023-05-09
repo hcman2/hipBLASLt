@@ -72,7 +72,7 @@ class ShiftVectorComponentsMFMA(ShiftVectorComponents):
         regPerElem      = kernel["MIRegPerOut"]
         glvw            = tP["glvw"]
         numThreadInWave = writer.states.kernel["WavefrontSize"]
-        accImOffset     = accVgprImagNumOffset(kernel, writer.states.lrvwB)
+        accImOffset     = accVgprImagNumOffset(kernel)
         vectorWidth     = kernel["VectorWidth"] if (kernel["SourceSwap"] and tP["isA"]) else 1
 
         # use to handle MatrixInst 4x4
@@ -216,7 +216,7 @@ class ShiftVectorComponentsMFMA(ShiftVectorComponents):
             module.add(SBranch(labelName=glvwLabels[glvw-1].getLabelName(), comment="no shifting" ))
             writer.vgprPool.checkIn(rReg)
 
-            _, arch2acc = accToArchMapper(kernel, writer.states.lrvwB)
+            _, arch2acc = accToArchMapper(kernel)
 
             # blocks for handle M_size % vector width
             for r in range(1, glvw):

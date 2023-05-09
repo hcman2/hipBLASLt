@@ -46,6 +46,7 @@ import copy
 import collections
 from dataclasses import dataclass, field
 from typing import Dict, NamedTuple, Tuple, Type
+from math import ceil
 
 # Make const values immutable
 class ConstValues(NamedTuple):
@@ -66,6 +67,7 @@ class MatrixInfo:
   numVgprValuPack: int           = -1
   startVgprValu: int             = -1
   startVgprValuPack: int         = -1
+  startVgprValuPackTemp: int     = -1
 
   numSgprStrides: int            = -1
 
@@ -147,9 +149,11 @@ class StateValues:
 
   numItersPLR: int                       = 0
   numVgprBuffer: int                     = 0
-  numVgprBufferPack: int                 = 0
-  lrvwA: int                             = 0
-  lrvwB: int                             = 0
+  numVgprBufferPackA: int                = 0
+  numVgprBufferPackB: int                = 0
+  lrvwTileA: int                         = 0
+  lrvwUnrollA: int                       = 0
+  lrvwUnrollB: int                       = 0
 
   vgprValuDouble: bool                   = False
   numMfmaPerIter: int                    = 0
@@ -158,6 +162,8 @@ class StateValues:
   numReadsIterCoalescedB: int            = 0
   numIterPerCoalescedReadA: int          = 0
   numIterPerCoalescedReadB: int          = 0
+  numReadsPerUnrollA: int                = 0
+  numReadsPerUnrollB: int                = 0
   # KernelWriterAssembly
   mixinst: Optional[Type[Instruction]]   = None
   globalReadIncsUseVgpr: bool            = False
@@ -626,8 +632,8 @@ class KernelWriter(metaclass=abc.ABCMeta):
           packAIdx += instPerPack if i//(kernel["MIWaveTileA"]+kernel["MIWaveTileA"]*kernel["MIWaveTileB"]*(i//(kernel["MIWaveTileA"]*kernel["MIWaveTileB"]))) == 0 else 0
           packBIdx += instPerPack if i % kernel["MIWaveTileA"] == 0 else 0
           # blockWidth < 1, means 0.5 or 0.25 (BF,H,Int8)
-          packAIdx = packAIdx if tPA["localReadInstruction"].blockWidth < 1 else 0
-          packBIdx = packBIdx if tPB["localReadInstruction"].blockWidth < 1 else 0
+          packAIdx = packAIdx if tPA["bpe"] < 4 and not kernel["UnrollMajorLDSA"] else 0
+          packBIdx = packBIdx if tPB["bpe"] < 4 and not kernel["UnrollMajorLDSB"] else 0
           numPack = (packAIdx + packBIdx)
           iterCode.addComment0("pack scheduling: packAIdx:%u, packBIdx:%u" %(packAIdx,packBIdx))
           # we put 2 pack in each mfma, "2" means A & B
@@ -1018,8 +1024,8 @@ class KernelWriter(metaclass=abc.ABCMeta):
           packAIdx += instPerPack if i//(kernel["MIWaveTileA"]+kernel["MIWaveTileA"]*kernel["MIWaveTileB"]*(i//(kernel["MIWaveTileA"]*kernel["MIWaveTileB"]))) == 0 else 0
           packBIdx += instPerPack if i % kernel["MIWaveTileA"] == 0 else 0
           # blockWidth < 1, means 0.5 or 0.25 (BF,H,Int8)
-          packAIdx = packAIdx if tPA["localReadInstruction"].blockWidth < 1 else 0
-          packBIdx = packBIdx if tPB["localReadInstruction"].blockWidth < 1 else 0
+          packAIdx = packAIdx if tPA["bpe"] < 4 and not kernel["UnrollMajorLDSA"] else 0
+          packBIdx = packBIdx if tPB["bpe"] < 4 and not kernel["UnrollMajorLDSB"] else 0
           numPack = (packAIdx + packBIdx)
           iterCode.addComment0("pack scheduling: packAIdx:%u, packBIdx:%u" %(packAIdx,packBIdx))
           # we put 2 pack in each mfma
@@ -2591,61 +2597,56 @@ class KernelWriter(metaclass=abc.ABCMeta):
       self.states.numVgprBuffer = kernel["LoopIters"]
     else:
       self.states.numVgprBuffer = kernel["PrefetchLocalRead"] + 1
-    self.states.numVgprBufferPack = self.states.numVgprBuffer if kernel["ClusterLocalReadPack"] else self.states.numItersPLR + 1
 
+    if kernel["ClusterLocalReadPack"]:
+      self.states.numVgprBufferPackA = kernel["LoopIters"]
+      self.states.numVgprBufferPackB = kernel["LoopIters"]
+    else:
+      self.states.numVgprBufferPackA = self.states.numItersPLR + 1
+      self.states.numVgprBufferPackB = self.states.numItersPLR + 1
 
     # TODO load sub-vector
     vwa = kernel["GlobalLoadVectorWidthA"]
     vwb = kernel["GlobalLoadVectorWidthB"]
 
-    if not kernel["ProblemType"]["TLUA"] or kernel["allowLRVWforTLUandMI"]:
-      if (not kernel["ProblemType"]["TLUA"]) and kernel["DirectToVgprA"]:
-        # DirectToVgpr + TLU=False case, ignore LocalReadVectorWidth and use GlobalLoadVectorWidth instead.
-        self.states.lrvwA = vwa
-      else:
-        self.states.lrvwA = kernel["LocalReadVectorWidth"]
+    if kernel["SourceSwap"] and kernel["VectorWidth"] > 1 and not kernel["UnrollMajorLDSA"]:
+      self.states.lrvwTileA = kernel["VectorWidth"]
     else:
-      if kernel["EnableMatrixInstruction"]:
-        self.states.lrvwA = kernel["MIInputPerThread"]
-      else:
-        self.states.lrvwA = 1
+      self.states.lrvwTileA = 1
 
-    if not kernel["ProblemType"]["TLUB"] or kernel["allowLRVWforTLUandMI"]:
-      if (not kernel["ProblemType"]["TLUB"]) and kernel["DirectToVgprB"]:
-        # DirectToVgpr + TLU=False case, ignore LocalReadVectorWidth and use GlobalLoadVectorWidth instead.
-        self.states.lrvwB = vwb
-      else:
-        self.states.lrvwB = kernel["LocalReadVectorWidth"]
+    if self.states.lrvwTileA > 1 and (kernel["ProblemType"]["DataType"].isHalf() or kernel["ProblemType"]["DataType"].isBFloat16() or kernel["ProblemType"]["DataType"].isInt8()):
+      self.states.numVgprBufferPackA = 1
+
+    if kernel["UnrollMajorLDSA"]:
+      self.states.lrvwUnrollA = kernel["LocalReadVectorWidth"]
     else:
-      if kernel["EnableMatrixInstruction"]:
-        self.states.lrvwB = kernel["MIInputPerThread"]
-      else:
-        self.states.lrvwB = 1
+      self.states.lrvwUnrollA = 1
+    if kernel["UnrollMajorLDSB"]:
+      self.states.lrvwUnrollB = kernel["LocalReadVectorWidth"]
+    else:
+      self.states.lrvwUnrollB = 1
 
-    # DirectToVgprB + VW > 1 case, set lrvwB = VW
+    # DirectToVgprB + VW > 1 case, set lrvwUnrollB = VW
     # DirectToVgprB case, global load data directly goes to Vgpr.
     # If VW=2, it means lrwvB is 2.
     if kernel["DirectToVgprB"] and kernel["VectorWidth"] > 1:
-      self.states.lrvwB = kernel["VectorWidth"]
+      self.states.lrvwUnrollB = kernel["VectorWidth"]
     # DirectToVgpr + TLU=False case
     # set lrvw = VW
     self.states.vgprValuDouble = False
     #if kernel["DirectToVgprA"] and kernel["PrefetchLocalRead"] > 1 and (not kernel["ProblemType"]["TLUA"]) and kernel["VectorWidth"] > 1:
     if kernel["DirectToVgprA"] and (not kernel["ProblemType"]["TLUA"]) and (not kernel["ProblemType"]["TLUB"]) or \
        kernel["DirectToVgprB"] and (not kernel["ProblemType"]["TLUB"]) and (not kernel["ProblemType"]["TLUA"]):
-      self.states.lrvwA = max(self.states.lrvwA, self.states.lrvwB)
-      self.states.lrvwB = self.states.lrvwA
-      if kernel["DepthU"] // kernel["MatrixInstK"] <= 2 and self.states.lrvwA > 1:
+      self.states.lrvwUnrollA = max(self.states.lrvwUnrollA, self.states.lrvwUnrollB)
+      self.states.lrvwUnrollB = self.states.lrvwUnrollA
+      if kernel["DepthU"] // kernel["MatrixInstK"] <= 2 and self.states.lrvwUnrollA > 1:
         # need to double vgprValu to avoid local read overwritting vgprValu registers
         self.states.vgprValuDouble = True
 
     # Wider LocalRead
     if kernel["EnableMatrixInstruction"]:
-      self.states.numReadsIterCoalescedA = self.states.lrvwA // kernel["MIInputPerThread"]
-      self.states.numReadsIterCoalescedB = self.states.lrvwB // kernel["MIInputPerThread"]
-      if kernel["allowLRVWforTLUandMI"]:
-        self.states.numReadsIterCoalescedA = 1
-        self.states.numReadsIterCoalescedB = 1
+      self.states.numReadsIterCoalescedA = ceil(self.states.lrvwUnrollA / kernel["MIInputPerThread"])
+      self.states.numReadsIterCoalescedB = ceil(self.states.lrvwUnrollB / kernel["MIInputPerThread"])
     else:
       self.states.numReadsIterCoalescedA  = 1
       self.states.numReadsIterCoalescedB  = 1
@@ -2930,8 +2931,8 @@ class KernelWriter(metaclass=abc.ABCMeta):
     self.initGlobalReadMemoryInstruction(instructions, tensorParametersB, self.states.bpr)
     self.initLocalWriteMemoryInstruction(instructions, kernel, tensorParametersA, self.states.bpr)
     self.initLocalWriteMemoryInstruction(instructions, kernel, tensorParametersB, self.states.bpr)
-    self.initLocalReadMemoryInstruction(instructions, kernel, tensorParametersA, self.states.bpr, self.states.lrvwA)
-    self.initLocalReadMemoryInstruction(instructions, kernel, tensorParametersB, self.states.bpr, self.states.lrvwB)
+    self.initLocalReadMemoryInstruction(instructions, kernel, tensorParametersA, self.states.bpr)
+    self.initLocalReadMemoryInstruction(instructions, kernel, tensorParametersB, self.states.bpr)
 
     # global reads per instruction
     tensorParametersA["nrcvpi"] = int((tensorParametersA["globalReadInstruction"].totalWidth*self.states.bpr)/tensorParametersA["bpe"])
@@ -2961,6 +2962,8 @@ class KernelWriter(metaclass=abc.ABCMeta):
     if kernel["DirectToVgprA"]:
       self.states.a.numVgprValuPerBlock = 0
     self.states.a.numVgprValu = self.states.a.numVgprValuPerBlock * valuBlocks
+    if self.states.lrvwTileA > 1 and tensorParametersA["bpe"] < 4:
+      self.states.a.numVgprValu = self.states.a.numVgprValuPerBlock * kernel["InnerUnroll"]
     # change numVgprValuBPerBlock to 0 for B if DirectToVgpr is enabled
     if kernel["DirectToVgprB"]:
       self.states.b.numVgprValuPerBlock = 0
@@ -3101,9 +3104,12 @@ class KernelWriter(metaclass=abc.ABCMeta):
       vgprIdx += 1
     self.states.a.startVgprValu  = vgprIdx
     vgprIdx += self.states.a.numVgprValu
-    if tensorParametersA["localReadInstruction"].blockWidth < 1:
+    if tensorParametersA["bpe"] < 4 and not kernel["UnrollMajorLDSA"]:
       self.states.a.startVgprValuPack = vgprIdx
-      vgprIdx += self.states.a.numVgprValuPerBlock * kernel["InnerUnroll"] * self.states.numVgprBufferPack * (int(1/tensorParametersA["localReadInstruction"].blockWidth) - 1)
+      if self.states.lrvwTileA > 1:
+        vgprIdx += ceil(kernel["VectorWidth"] * tensorParametersA["bpe"] / self.states.bpr) * kernel["MIWaveTileA"] // kernel["VectorWidth"] * kernel["InnerUnroll"] * self.states.numVgprBuffer * kernel["MIInputPerThread"]
+      else:
+        vgprIdx += self.states.a.numVgprValuPerBlock * kernel["InnerUnroll"] * self.states.numVgprBufferPackA * (int(4/tensorParametersA["bpe"]) - 1)
     self.states.a.startVgprG2L = None
     if not kernel["DirectToLdsA"] or self.do["KeepDirectToLdsAlloc"]:
       # if PGR = True, PAP could be possibly enabled, we move G2LA later to prevent it from being reclaimed
@@ -3117,9 +3123,9 @@ class KernelWriter(metaclass=abc.ABCMeta):
     vgprIdx = ((vgprIdx+1)//2)*2
     self.states.b.startVgprValu  = vgprIdx
     vgprIdx += self.states.b.numVgprValu
-    if tensorParametersB["localReadInstruction"].blockWidth < 1:
+    if tensorParametersB["bpe"] < 4 and not kernel["UnrollMajorLDSB"]:
       self.states.b.startVgprValuPack = vgprIdx
-      vgprIdx += self.states.b.numVgprValuPerBlock * kernel["InnerUnroll"] * self.states.numVgprBufferPack * (int(1/tensorParametersB["localReadInstruction"].blockWidth) - 1)
+      vgprIdx += self.states.b.numVgprValuPerBlock * kernel["InnerUnroll"] * self.states.numVgprBufferPackB * (int(4/tensorParametersB["bpe"]) - 1)
     self.states.b.startVgprG2L = None
     if not kernel["DirectToLdsB"] or self.do["KeepDirectToLdsAlloc"]:
       # if PGR = True, PAP could be possibly enabled, we move G2LB later to prevent it from being reclaimed
@@ -3141,6 +3147,12 @@ class KernelWriter(metaclass=abc.ABCMeta):
       self.states.bias.numVgprValu = 0
     self.states.bias.startVgprValu = vgprIdx
     vgprIdx += self.states.bias.numVgprValu
+
+    if ((tensorParametersA["bpe"] < 4 and not kernel["UnrollMajorLDSA"]) or (tensorParametersB["bpe"] < 4 and not kernel["UnrollMajorLDSB"])) \
+        and kernel["ProblemType"]["DataType"].isInt8():
+      self.states.a.startVgprValuPackTemp = vgprIdx
+      self.states.b.startVgprValuPackTemp = vgprIdx
+      vgprIdx += 1
 
     # Registers allocated above this point can be used as temps during setup
     # Registers above here are reserved in initC, near the end of the setup
@@ -3440,25 +3452,23 @@ class KernelWriter(metaclass=abc.ABCMeta):
     # reads Per Iteration
     ########################################
     if kernel["EnableMatrixInstruction"]:
-      # setting numReadPerVector to 0 for DirectToVgpr makes performance a little worse.
-      # so, keep this part unchanged.
-      #self.states.numReadPerVectorA = 0 if kernel["DirectToVgprA"] else tPA["bpe"] * self.states.lrvwA // int(tPA["localReadInstruction"].blockWidth * 4)
-      #self.states.numReadPerVectorB = 0 if kernel["DirectToVgprB"] else tPB["bpe"] * self.states.lrvwB // int(tPB["localReadInstruction"].blockWidth * 4)
-      self.states.numReadPerVectorA = tensorParametersA["bpe"] * self.states.lrvwA // int(tensorParametersA["localReadInstruction"].blockWidth * 4)
-      self.states.numReadPerVectorB = tensorParametersB["bpe"] * self.states.lrvwB // int(tensorParametersB["localReadInstruction"].blockWidth * 4)
-      numA = kernel["InnerUnroll"]*(kernel["MIWaveTile"][0] * self.states.numReadPerVectorA) // tensorParametersA["localReadInstruction"].numOffsets
-      numB = kernel["InnerUnroll"]*(kernel["MIWaveTile"][1] * self.states.numReadPerVectorB) // tensorParametersB["localReadInstruction"].numOffsets
+      if kernel["UnrollMajorLDSA"]:
+        self.states.numReadsPerUnrollA = ceil(tensorParametersA["bpe"] * kernel["MIInputPerThread"] / int(tensorParametersA["localReadInstruction"].blockWidth * 4))
+      else:
+        self.states.numReadsPerUnrollA = kernel["MIInputPerThread"]
+      numA = kernel["InnerUnroll"]*(kernel["MIWaveTile"][0] * self.states.numReadsPerUnrollA) // tensorParametersA["localReadInstruction"].numOffsets
+      if self.states.lrvwTileA > 1:
+        numA = numA // kernel["VectorWidth"]
+      self.states.numReadsPerUnrollB = ceil(tensorParametersB["bpe"] * kernel["MIInputPerThread"] / int(tensorParametersB["localReadInstruction"].blockWidth * 4))
+      numB = kernel["InnerUnroll"]*(kernel["MIWaveTile"][1] * self.states.numReadsPerUnrollB) // tensorParametersB["localReadInstruction"].numOffsets
+
       # wider localread has 2 mode
       # 1. using larger IU to coalesced localread, only half of local reads in 1 iteration
       # 2. using larger PLR to read more iterations, same number local reads in 1 iteration
       if kernel["InnerUnroll"] >= self.states.numReadsIterCoalescedA:
         numA //= self.states.numReadsIterCoalescedA
-        if kernel["allowLRVWforTLUandMI"]:
-          numA //= self.states.lrvwA
       if kernel["InnerUnroll"] >= self.states.numReadsIterCoalescedB:
         numB //= self.states.numReadsIterCoalescedB
-        if kernel["allowLRVWforTLUandMI"]:
-          numB //= self.states.lrvwB
     else:
       printExit("TensileLite does not support non MFMA.")
     self.states.numReadsPerIterA = numA

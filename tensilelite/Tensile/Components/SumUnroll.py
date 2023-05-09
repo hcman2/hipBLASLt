@@ -121,7 +121,6 @@ class SumUnrollMfma(SumUnroll):
     maxKId is calculated to find out the length of the sum index.
     """
     def storeSumLDS(self, writer, kernel, tP):
-        assert not kernel["allowLRVWforTLUandMI"]
         imod = Module("StoreSumLDS")
         # Unregister defined sgpr
         if kernel["ProblemType"]["DataType"].numRegisters() < 1:
