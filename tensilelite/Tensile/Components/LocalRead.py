@@ -51,17 +51,11 @@ class LocalReadMFMA(LocalRead):
         unrollBlockWidth = instruction.blockWidth if kernel["UnrollMajorLDS%s"%tc] else tP["bpe"]/4
         tileBlockWidth   = tP["bpe"]/4 if kernel["UnrollMajorLDS%s"%tc] else instruction.blockWidth
 
-        # TODO: VectorWidthA, VectorWidthB
-        # Currently we support VectorWidth along M direction for SourceSwap
-        # So we can use wider local read for A
-        if kernel["SourceSwap"] and tc == "A":
-            vectorWidth  = kernel["VectorWidth"]
-        else:
-            vectorWidth  = 1
+        vectorWidth  = kernel["VectorWidth%s"%tc]
 
         if kernel["SourceSwap"]:
-            MIWaveGroupShape = [ kernel["MatrixInstM"] * kernel["MatrixInstBM"] * kernel["MIWaveGroup"][0] * vectorWidth, \
-                                kernel["MatrixInstN"] * kernel["MatrixInstBN"] * kernel["MIWaveGroup"][1]]
+            MIWaveGroupShape = [ kernel["MatrixInstM"] * kernel["MatrixInstBM"] * kernel["MIWaveGroup"][0] * kernel["VectorWidthA"], \
+                                kernel["MatrixInstN"] * kernel["MatrixInstBN"] * kernel["MIWaveGroup"][1] * kernel["VectorWidthB"]]
         else:
             MIWaveGroupShape = [ kernel["MatrixInstM"] * kernel["MatrixInstBM"] * kernel["MIWaveGroup"][0], \
                                 kernel["MatrixInstN"] * kernel["MatrixInstBN"] * kernel["MIWaveGroup"][1]]
@@ -97,7 +91,7 @@ class LocalReadMFMA(LocalRead):
                     baseLRVgpr = vgpr("Valu%s_X%u_I%u+%u"%(tc, bufferIdx, iui, valuiIdx), numVgpr)
                     destVgpr = baseLRVgpr
 
-                    if writer.states.lrvwTileA > 1 and tc == 'A':
+                    if (writer.states.lrvwTileA > 1 and tc == 'A') or (writer.states.lrvwTileB > 1 and tc == 'B'):
                         highBitsForHalf = 0
                         isHigh8Bits = 0
                         isHigh16Bits = 0
@@ -106,7 +100,7 @@ class LocalReadMFMA(LocalRead):
                         if rIdx == numReadsPerUnroll-1:
                             for i in range(0, numVgpr):
                                 # convert from [tile][MiInputPerThread][vector] to [tile][vector][MiInputPerThread]
-                                vgprIdx = (vIdx*numVgpr+i)*tP["bpe"]*kernel["MIInputPerThread"]//writer.states.bpr*min(writer.states.bpr//tP["bpe"],writer.states.lrvwTileA)
+                                vgprIdx = (vIdx*numVgpr+i)*tP["bpe"]*kernel["MIInputPerThread"]//writer.states.bpr*min(writer.states.bpr//tP["bpe"],vectorWidth)
                                 if kernel["ProblemType"]["DataType"].isHalf() or kernel["MFMA_BF16_1K"]:
                                     packCode.add(VPermB32(dst=vgpr("Valu%s_X%u_I%u+%u"%(tc, bufferIdx, iui, vgprIdx + 0)), src0=vgpr("Valu%s_X%u_I%u_D1+%u"%(tc, bufferIdx, iui, i+vIdx*numVgpr)), src1=vgpr("Valu%s_X%u_I%u_D0+%u"%(tc, bufferIdx, iui, i+vIdx*numVgpr)), src2=sgpr("PackKForV0"), comment="select K=01 for vector=0"))
                                     packCode.add(VPermB32(dst=vgpr("Valu%s_X%u_I%u+%u"%(tc, bufferIdx, iui, vgprIdx + 1)), src0=vgpr("Valu%s_X%u_I%u_D3+%u"%(tc, bufferIdx, iui, i+vIdx*numVgpr)), src1=vgpr("Valu%s_X%u_I%u_D2+%u"%(tc, bufferIdx, iui, i+vIdx*numVgpr)), src2=sgpr("PackKForV0"), comment="select K=23 for vector=0"))
@@ -122,7 +116,7 @@ class LocalReadMFMA(LocalRead):
                                     packCode.add(VPermB32(dst=vgpr("Valu%s_X%u_I%u+%u"%(tc, bufferIdx, iui, vgprIdx + 1)), src0=vgpr("Valu%s_X%u_I%u_D1+%u"%(tc, bufferIdx, iui, i+vIdx*numVgpr)), src1=vgpr("Valu%s_X%u_I%u_D0+%u"%(tc, bufferIdx, iui, i+vIdx*numVgpr)), src2=sgpr("PackKForV1"), comment="select K=01 for vector=1"))
                                     packCode.add(VPermB32(dst=vgpr("PackTemp"), src0=vgpr("Valu%s_X%u_I%u_D3+%u"%(tc, bufferIdx, iui, i+vIdx*numVgpr)), src1=vgpr("Valu%s_X%u_I%u_D2+%u"%(tc, bufferIdx, iui, i+vIdx*numVgpr)), src2=sgpr("PackKForV1"), comment="select K=23 for vector=1"))
                                     packCode.add(VLShiftLeftOrB32(dst=vgpr("Valu%s_X%u_I%u+%u"%(tc, bufferIdx, iui, vgprIdx + 1)), src0=vgpr("PackTemp"), shiftHex=16, src1=vgpr("Valu%s_X%u_I%u+%u"%(tc, bufferIdx, iui, vgprIdx + 1)), comment="pack two half Vgpr to one Vgpr"))
-                                    if writer.states.lrvwTileA > 2:
+                                    if vectorWidth > 2:
                                         packCode.add(VPermB32(dst=vgpr("Valu%s_X%u_I%u+%u"%(tc, bufferIdx, iui, vgprIdx + 2)), src0=vgpr("Valu%s_X%u_I%u_D1+%u"%(tc, bufferIdx, iui, i+vIdx*numVgpr)), src1=vgpr("Valu%s_X%u_I%u_D0+%u"%(tc, bufferIdx, iui, i+vIdx*numVgpr)), src2=sgpr("PackKForV2"), comment="select K=01 for vector=2"))
                                         packCode.add(VPermB32(dst=vgpr("PackTemp"), src0=vgpr("Valu%s_X%u_I%u_D3+%u"%(tc, bufferIdx, iui, i+vIdx*numVgpr)), src1=vgpr("Valu%s_X%u_I%u_D2+%u"%(tc, bufferIdx, iui, i+vIdx*numVgpr)), src2=sgpr("PackKForV2"), comment="select K=23 for vector=2"))
                                         packCode.add(VLShiftLeftOrB32(dst=vgpr("Valu%s_X%u_I%u+%u"%(tc, bufferIdx, iui, vgprIdx + 2)), src0=vgpr("PackTemp"), shiftHex=16, src1=vgpr("Valu%s_X%u_I%u+%u"%(tc, bufferIdx, iui, vgprIdx + 2)), comment="pack two half Vgpr to one Vgpr"))

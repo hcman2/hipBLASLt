@@ -69,11 +69,12 @@ class ShiftVectorComponentsMFMA(ShiftVectorComponents):
             return Module("ShiftVectorComponentsMFMA (Empty)")
 
         # common parameter
+        tc              = tP["tensorChar"]
         regPerElem      = kernel["MIRegPerOut"]
         glvw            = tP["glvw"]
         numThreadInWave = writer.states.kernel["WavefrontSize"]
         accImOffset     = accVgprImagNumOffset(kernel)
-        vectorWidth     = kernel["VectorWidth"] if (kernel["SourceSwap"] and tP["isA"]) else 1
+        vectorWidth     = kernel["VectorWidth%s"%tc]
 
         # use to handle MatrixInst 4x4
         matrixInstM     = kernel["MatrixInstM"] * kernel["MatrixInstBM"] if (kernel["MatrixInstM"] == 4) else kernel["MatrixInstM"]
@@ -97,10 +98,10 @@ class ShiftVectorComponentsMFMA(ShiftVectorComponents):
         threadInterval  = 1 if conThInProcDim else matrixInstPrep
         numThreadInCoal = matrixInstCoal if conThInProcDim else (numThreadInWave // matrixInstPrep)
 
-        numContOutCoal  = 1 if conThInProcDim else kernel["MIOutputVectorWidth"]
-        allContOutCoal  = numContOutCoal * vectorWidth
+        numContOutCoal  = vectorWidth if conThInProcDim else kernel["MIOutputVectorWidth"] * vectorWidth
+        allContOutCoal  = numContOutCoal
 
-        OutBlocksInMI   = (matrixInstCoal * matrixInstPrep) // numThreadInWave // numContOutCoal
+        OutBlocksInMI   = (vectorWidth * matrixInstCoal * matrixInstPrep) // numThreadInWave // numContOutCoal
         OutBlocksInMI   = 1 if conThInProcDim else OutBlocksInMI
 
         subMBShapeCoal  = (matrixInstCoal * vectorWidth) if conThInProcDim else ((numThreadInWave // matrixInstPrep) * numContOutCoal)

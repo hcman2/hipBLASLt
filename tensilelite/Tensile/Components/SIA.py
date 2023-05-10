@@ -236,17 +236,21 @@ def getLocalWriteMFMAStart(writer, kernel, tensorParametersA, tensorParametersB,
     else:
         # for 1LDSB, we have to issue localwrites after localreads
         if kernel["ClusterLocalRead"]:
-            if ((writer.states.numReadsPerUnrollA != 1 and not(writer.states.lrvwTileA > 1 and (kernel["ProblemType"]["DataType"].isHalf() or kernel["ProblemType"]["DataType"].isBFloat16()))) or \
-              writer.states.numReadsPerUnrollB != 1) and not kernel["ClusterLocalReadPack"]:
+            if ((not kernel["UnrollMajorLDSA"] and writer.states.lrvwTileA * kernel["ProblemType"]["DataType"].numBytes() < 4) or \
+                    (not kernel["UnrollMajorLDSB"] and writer.states.lrvwTileB * kernel["ProblemType"]["DataType"].numBytes() < 4)) and \
+                    not kernel["ClusterLocalReadPack"]:
             # fp16 or bf16, we read 1 element to vgprBuffer the other element to tempVgpr.
             # since each iteration shares same tempVgpr, only read-to-vgprBuffer can
             # be scheduled in the front of loop.
                 # localwrite have to start after last read-to-tempVgpr.
-                if writer.states.lrvwTileA > 1 and (kernel["ProblemType"]["DataType"].isHalf() or kernel["ProblemType"]["DataType"].isBFloat16()):
+                if not kernel["UnrollMajorLDSA"] and writer.states.lrvwTileA * kernel["ProblemType"]["DataType"].numBytes() >= 4:
                     numHalfReadsA = 0
                 else:
                     numHalfReadsA = (writer.states.numReadsPerUnrollA//2)*kernel["InnerUnroll"]*kernel["MIWaveTileA"]
-                numHalfReadsB = (writer.states.numReadsPerUnrollB//2)*kernel["InnerUnroll"]*kernel["MIWaveTileB"]
+                if not kernel["UnrollMajorLDSB"] and writer.states.lrvwTileB * kernel["ProblemType"]["DataType"].numBytes() >= 4:
+                    numHalfReadsB = 0
+                else:
+                    numHalfReadsB = (writer.states.numReadsPerUnrollB//2)*kernel["InnerUnroll"]*kernel["MIWaveTileB"]
                 numHalfReads = numHalfReadsA + numHalfReadsB
                 numHalfReads = (writer.states.numReadPerVectorA//2)*kernel["InnerUnroll"]*kernel["MIWaveTileA"] + (writer.states.numReadsPerUnrollB//2)*kernel["InnerUnroll"]*kernel["MIWaveTileB"]
                 numMfmaForHalfRead = 1

@@ -830,11 +830,11 @@ validParameters = {
     # GlobalReadVectorWidth also controls local write width.
     # Local read width also matches since VectorWidth consec elements must be read
     # Typically matching 16 bytes is good choice since the stores will be optimally coalesced with 16 bytes/WI.
-    # -1 means use the largest vector width up to 128 bits.
     # Using a VW too large which results in >16bytes/thread isn't supported
     # For MFMA non SourceSwap: this parameter didn't take effect
-    # For MFMA SourceSwap: this parameter only take effect on A buffer for now
-    "VectorWidth":                [ -1, 1, 2, 3, 4, 6, 8 ],
+    # -1 means set vw to largest localReadWidth according to MIWaveTile
+    "VectorWidthA":               [ -1, 1, 2, 3, 4, 6, 8 ],
+    "VectorWidthB":               [ -1, 1, 2, 3, 4, 6, 8 ],
 
     # If 0, store 1 element per instruction.
     # If 1, store vector-width elements per instruction.
@@ -973,7 +973,8 @@ defaultBenchmarkCommonParameters = [
     {"LdsBlockSizePerPadB":       [ 0 ] },
     {"TransposeLDS":              [ 0 ] },
     {"MaxOccupancy":              [ 40 ] },
-    {"VectorWidth":               [ -1 ] },
+    {"VectorWidthA":              [ -1 ] },
+    {"VectorWidthB":              [ -1 ] },
     {"VectorStore":               [ -1 ] },
     {"StoreVectorWidth":          [ -1 ] },
     {"GlobalReadVectorWidth":     [ -1 ] },

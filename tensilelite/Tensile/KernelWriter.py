@@ -152,6 +152,7 @@ class StateValues:
   numVgprBufferPackA: int                = 0
   numVgprBufferPackB: int                = 0
   lrvwTileA: int                         = 0
+  lrvwTileB: int                         = 0
   lrvwUnrollA: int                       = 0
   lrvwUnrollB: int                       = 0
 
@@ -1063,17 +1064,17 @@ class KernelWriter(metaclass=abc.ABCMeta):
         if numLoadVgpr > 0:
           interval = roundUp(numMfmaPerIter / origLenGlobalReadCodeDTV)
           tileIndex = 0 if kernel["DirectToVgprA"] else 1
-          if (kernel["MIWaveTile"][tileIndex] // kernel["VectorWidth"]) > 1:
+          if (kernel["MIWaveTile"][tileIndex] // kernel["VectorWidthA"]) > 1:
             if kernel["ProblemType"]["DataType"].isDoubleComplex():
               # adjustment for double complex
-              # limit the max of interval up to 4 if (kernel["MIWaveTile"][0] // kernel["VectorWidth"]) > 1
+              # limit the max of interval up to 4 if (kernel["MIWaveTile"][0] // kernel["VectorWidthA"]) > 1
               interval = min(4, interval)
             elif kernel["ProblemType"]["DataType"].isDouble():
               # adjustment for double
               # in this case, interval must be 1 to avoid overwritting vreg by global read
               interval = 1
           # DirectToVgprA + TLU=False + VW > 1 case, need to use interval = 1
-          if kernel["DirectToVgprA"] and (not kernel["ProblemType"]["TLUA"]) and kernel["VectorWidth"] > 1:
+          if kernel["DirectToVgprA"] and (not kernel["ProblemType"]["TLUA"]) and kernel["VectorWidthA"] > 1:
             interval = 1
           # if number of mfma after self.states.grEndMfmaIndex is smaller than numMfmaPerIter, we need to use smaller interval to insert DTV load.
           # this is to ensure DTV load is generated after lwStartMfmaIndex
@@ -2609,13 +2610,21 @@ class KernelWriter(metaclass=abc.ABCMeta):
     vwa = kernel["GlobalLoadVectorWidthA"]
     vwb = kernel["GlobalLoadVectorWidthB"]
 
-    if kernel["SourceSwap"] and kernel["VectorWidth"] > 1 and not kernel["UnrollMajorLDSA"]:
-      self.states.lrvwTileA = kernel["VectorWidth"]
+    if kernel["SourceSwap"] and not kernel["UnrollMajorLDSA"]:
+      self.states.lrvwTileA = kernel["VectorWidthA"]
     else:
       self.states.lrvwTileA = 1
 
+    if kernel["SourceSwap"] and not kernel["UnrollMajorLDSB"]:
+      self.states.lrvwTileB = kernel["VectorWidthB"]
+    else:
+      self.states.lrvwTileB = 1
+
     if self.states.lrvwTileA > 1 and (kernel["ProblemType"]["DataType"].isHalf() or kernel["ProblemType"]["DataType"].isBFloat16() or kernel["ProblemType"]["DataType"].isInt8()):
       self.states.numVgprBufferPackA = 1
+
+    if self.states.lrvwTileB > 1 and (kernel["ProblemType"]["DataType"].isHalf() or kernel["ProblemType"]["DataType"].isBFloat16() or kernel["ProblemType"]["DataType"].isInt8()):
+      self.states.numVgprBufferPackB = 1
 
     if kernel["UnrollMajorLDSA"]:
       self.states.lrvwUnrollA = kernel["LocalReadVectorWidth"]
@@ -2629,12 +2638,12 @@ class KernelWriter(metaclass=abc.ABCMeta):
     # DirectToVgprB + VW > 1 case, set lrvwUnrollB = VW
     # DirectToVgprB case, global load data directly goes to Vgpr.
     # If VW=2, it means lrwvB is 2.
-    if kernel["DirectToVgprB"] and kernel["VectorWidth"] > 1:
-      self.states.lrvwUnrollB = kernel["VectorWidth"]
+    if kernel["DirectToVgprB"] and kernel["VectorWidthA"] > 1:
+      self.states.lrvwUnrollB = kernel["VectorWidthA"]
     # DirectToVgpr + TLU=False case
     # set lrvw = VW
     self.states.vgprValuDouble = False
-    #if kernel["DirectToVgprA"] and kernel["PrefetchLocalRead"] > 1 and (not kernel["ProblemType"]["TLUA"]) and kernel["VectorWidth"] > 1:
+    #if kernel["DirectToVgprA"] and kernel["PrefetchLocalRead"] > 1 and (not kernel["ProblemType"]["TLUA"]) and kernel["VectorWidthA"] > 1:
     if kernel["DirectToVgprA"] and (not kernel["ProblemType"]["TLUA"]) and (not kernel["ProblemType"]["TLUB"]) or \
        kernel["DirectToVgprB"] and (not kernel["ProblemType"]["TLUB"]) and (not kernel["ProblemType"]["TLUA"]):
       self.states.lrvwUnrollA = max(self.states.lrvwUnrollA, self.states.lrvwUnrollB)
@@ -2968,6 +2977,8 @@ class KernelWriter(metaclass=abc.ABCMeta):
     if kernel["DirectToVgprB"]:
       self.states.b.numVgprValuPerBlock = 0
     self.states.b.numVgprValu = self.states.b.numVgprValuPerBlock * valuBlocks
+    if self.states.lrvwTileB > 1 and tensorParametersB["bpe"] < 4:
+      self.states.b.numVgprValu = self.states.b.numVgprValuPerBlock * kernel["InnerUnroll"]
 
     ####################################
     # num vgprs: global -> local elements
@@ -3107,7 +3118,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
     if tensorParametersA["bpe"] < 4 and not kernel["UnrollMajorLDSA"]:
       self.states.a.startVgprValuPack = vgprIdx
       if self.states.lrvwTileA > 1:
-        vgprIdx += ceil(kernel["VectorWidth"] * tensorParametersA["bpe"] / self.states.bpr) * kernel["MIWaveTileA"] // kernel["VectorWidth"] * kernel["InnerUnroll"] * self.states.numVgprBuffer * kernel["MIInputPerThread"]
+        vgprIdx += ceil(kernel["VectorWidthA"] * tensorParametersA["bpe"] / self.states.bpr) * kernel["MIWaveTileA"] // kernel["VectorWidthA"] * kernel["InnerUnroll"] * self.states.numVgprBuffer * kernel["MIInputPerThread"]
       else:
         vgprIdx += self.states.a.numVgprValuPerBlock * kernel["InnerUnroll"] * self.states.numVgprBufferPackA * (int(4/tensorParametersA["bpe"]) - 1)
     self.states.a.startVgprG2L = None
@@ -3125,7 +3136,10 @@ class KernelWriter(metaclass=abc.ABCMeta):
     vgprIdx += self.states.b.numVgprValu
     if tensorParametersB["bpe"] < 4 and not kernel["UnrollMajorLDSB"]:
       self.states.b.startVgprValuPack = vgprIdx
-      vgprIdx += self.states.b.numVgprValuPerBlock * kernel["InnerUnroll"] * self.states.numVgprBufferPackB * (int(4/tensorParametersB["bpe"]) - 1)
+      if self.states.lrvwTileB > 1:
+        vgprIdx += ceil(kernel["VectorWidthB"] * tensorParametersB["bpe"] / self.states.bpr) * kernel["MIWaveTileB"] // kernel["VectorWidthB"] * kernel["InnerUnroll"] * self.states.numVgprBuffer * kernel["MIInputPerThread"]
+      else:
+        vgprIdx += self.states.b.numVgprValuPerBlock * kernel["InnerUnroll"] * self.states.numVgprBufferPackB * (int(4/tensorParametersB["bpe"]) - 1)
     self.states.b.startVgprG2L = None
     if not kernel["DirectToLdsB"] or self.do["KeepDirectToLdsAlloc"]:
       # if PGR = True, PAP could be possibly enabled, we move G2LB later to prevent it from being reclaimed
@@ -3458,9 +3472,14 @@ class KernelWriter(metaclass=abc.ABCMeta):
         self.states.numReadsPerUnrollA = kernel["MIInputPerThread"]
       numA = kernel["InnerUnroll"]*(kernel["MIWaveTile"][0] * self.states.numReadsPerUnrollA) // tensorParametersA["localReadInstruction"].numOffsets
       if self.states.lrvwTileA > 1:
-        numA = numA // kernel["VectorWidth"]
-      self.states.numReadsPerUnrollB = ceil(tensorParametersB["bpe"] * kernel["MIInputPerThread"] / int(tensorParametersB["localReadInstruction"].blockWidth * 4))
+        numA = numA // kernel["VectorWidthA"]
+      if kernel["UnrollMajorLDSB"]:
+        self.states.numReadsPerUnrollB = ceil(tensorParametersB["bpe"] * kernel["MIInputPerThread"] / int(tensorParametersB["localReadInstruction"].blockWidth * 4))
+      else:
+        self.states.numReadsPerUnrollB = kernel["MIInputPerThread"]
       numB = kernel["InnerUnroll"]*(kernel["MIWaveTile"][1] * self.states.numReadsPerUnrollB) // tensorParametersB["localReadInstruction"].numOffsets
+      if self.states.lrvwTileB > 1:
+        numB = numB // kernel["VectorWidthB"]
 
       # wider localread has 2 mode
       # 1. using larger IU to coalesced localread, only half of local reads in 1 iteration

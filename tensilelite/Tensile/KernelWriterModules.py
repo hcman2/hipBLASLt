@@ -130,15 +130,15 @@ def _getAccToArchInfo(kernel):
   matrixInstBN = 1                                                if (kernel["MatrixInstN"] == 4) else kernel["MatrixInstBN"]
 
   OutputsPerMFMA1B = matrixInstM * matrixInstN // kernel["WavefrontSize"]
-  VectorWidth0     = kernel["VectorWidth"] if kernel["SourceSwap"] else 1
+  VectorWidth0     = kernel["VectorWidthA"] if kernel["SourceSwap"] else 1
   outerTT0         = kernel["MIWaveTile"][0] // VectorWidth0
-  VectorWidth1     = 1
+  VectorWidth1     = kernel["VectorWidthB"] if kernel["SourceSwap"] else 1
   outerTT1         = kernel["MIWaveTile"][1] // VectorWidth1
-  return matrixInstBM, matrixInstBN, OutputsPerMFMA1B, VectorWidth0, outerTT0, outerTT1
+  return matrixInstBM, matrixInstBN, OutputsPerMFMA1B, VectorWidth0, VectorWidth1, outerTT0, outerTT1
 
 def getAccToArchLen(kernel):
-  matrixInstBM, matrixInstBN, OutputsPerMFMA1B, VectorWidth0, outerTT0, outerTT1 = _getAccToArchInfo(kernel)
-  return (outerTT1  *  outerTT0 * matrixInstBN * matrixInstBM * OutputsPerMFMA1B * VectorWidth0)
+  matrixInstBM, matrixInstBN, OutputsPerMFMA1B, VectorWidth0, VectorWidth1, outerTT0, outerTT1 = _getAccToArchInfo(kernel)
+  return (outerTT1 * outerTT0 * matrixInstBN * matrixInstBM * OutputsPerMFMA1B * VectorWidth0 * VectorWidth1)
 
 ##############################################################################
 # accToArchMapper
@@ -151,23 +151,24 @@ def accToArchMapper(kernel):
   acc2arch = dict()
   arch2acc = dict()
 
-  matrixInstBM, matrixInstBN, OutputsPerMFMA1B, VectorWidth0, outerTT0, outerTT1 = _getAccToArchInfo(kernel)
+  matrixInstBM, matrixInstBN, OutputsPerMFMA1B, VectorWidth0, VectorWidth1, outerTT0, outerTT1 = _getAccToArchInfo(kernel)
 
   for wgIdx1 in range(0, outerTT1):
     for wgIdx0 in range(0, outerTT0):
       for bIdx1 in range(0, matrixInstBN):
         for bIdx0 in range(0, matrixInstBM):
           for tIdx in range(0, OutputsPerMFMA1B):
-            for vw0 in range(0, VectorWidth0):
-              src, dst = 0, 0
-              if kernel["SourceSwap"]:
-                src = tIdx + OutputsPerMFMA1B * (bIdx0 + matrixInstBM * (bIdx1 + matrixInstBN * (vw0 + VectorWidth0 * (wgIdx0 + outerTT0 * wgIdx1))))
-                dst = vw0 + VectorWidth0 * (bIdx0 + matrixInstBM * (wgIdx0 + outerTT0 * ((tIdx + OutputsPerMFMA1B * (bIdx1 + matrixInstBN * wgIdx1)))))
-              else:
-                src = tIdx + OutputsPerMFMA1B * (bIdx1 + matrixInstBN * (bIdx0 + matrixInstBM * (wgIdx0 + outerTT0 * wgIdx1)))
-                dst = tIdx + OutputsPerMFMA1B * (bIdx0 + matrixInstBM * (wgIdx0 + outerTT0 * (bIdx1 + matrixInstBN * wgIdx1)))
-              acc2arch[src] = dst
-              arch2acc[dst] = src
+            for vw1 in range(0, VectorWidth1):
+              for vw0 in range(0, VectorWidth0):
+                src, dst = 0, 0
+                if kernel["SourceSwap"]:
+                  src = tIdx + OutputsPerMFMA1B * (bIdx0 + matrixInstBM * (bIdx1 + matrixInstBN * (vw0 + VectorWidth0 * (wgIdx0 + outerTT0 * (vw1 + VectorWidth1 * (wgIdx1))))))
+                  dst = vw0 + VectorWidth0 * (bIdx0 + matrixInstBM * (wgIdx0 + outerTT0 * (vw1 + VectorWidth1 * (tIdx + OutputsPerMFMA1B * (bIdx1 + matrixInstBN * (wgIdx1))))))
+                else:
+                  src = tIdx + OutputsPerMFMA1B * (bIdx1 + matrixInstBN * (bIdx0 + matrixInstBM * (wgIdx0 + outerTT0 * wgIdx1)))
+                  dst = tIdx + OutputsPerMFMA1B * (bIdx0 + matrixInstBM * (wgIdx0 + outerTT0 * (bIdx1 + matrixInstBN * wgIdx1)))
+                acc2arch[src] = dst
+                arch2acc[dst] = src
   return acc2arch, arch2acc
 
 def accVgprImagNumOffset(kernel):
