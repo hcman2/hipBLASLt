@@ -62,12 +62,6 @@ class LraTileAssignmentMFMA(LraTileAssignment):
         tile01           = tP["tile01Idx"]
         waveWidth        = writer.states.kernel["WavefrontSize"]
         inputPerThread   = kernel["LocalReadVectorWidth"] if not writer.states.inTailLoop else kernel["MIInputPerThread"]
-        if kernel["DirectToVgprA"]:
-          # DirectToVgprA case, ignore lrvwUnrollA
-          inputPerThread = writer.states.lrvwUnrollB
-        elif kernel["DirectToVgprB"]:
-          # DirectToVgprB case, ignore lrvwUnrollB
-          inputPerThread = writer.states.lrvwUnrollA
         LdsPad           = kernel["LdsPad%s" % tc] if kernel["LdsBlockSizePerPad%s" % tc] == 0 else 0
 
         # parameter for get each type index

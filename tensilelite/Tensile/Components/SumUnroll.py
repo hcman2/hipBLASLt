@@ -61,7 +61,6 @@ class SumUnrollMfma(SumUnroll):
     def loopSum(self, writer, kernel, tP, u, innerUnroll):
         tc   = tP["tensorChar"]
         imod = Module("SumUnroll%s_I%s" % (tc, innerUnroll))
-        assert (not kernel["DirectToVgpr%s"%tc])
 
         m = (u) % (writer.states.numVgprBuffer+1) # local to use for MACs
 
