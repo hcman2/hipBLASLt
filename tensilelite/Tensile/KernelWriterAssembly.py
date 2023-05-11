@@ -4279,7 +4279,8 @@ class KernelWriterAssembly(KernelWriter):
                     comment="skip to unrollLoop end loop%s iter b/c numIter==0" % loopChar))
     elif isOptNLL:
       skipOptNLL = Label("OptNLL_End", "")
-      with self.allocTmpSgpr(2) as tmpSgprInfo:
+      # checkIsEdge required 4 tmp sgpr if dividend is not power of 2
+      with self.allocTmpSgpr(4) as tmpSgprInfo:
         tmpSgpr = tmpSgprInfo.idx
         module.add(self.checkIsBetaZero(kernel, tmpSgpr, skipOptNLL, isLongBranch=isLongBranch, posNeg=1))
 
