@@ -1037,8 +1037,6 @@ class KernelWriterAssembly(KernelWriter):
       load = self.states.numSgprToLoad
       sgprStart = self.sgprs["AddressD"]
       moduleArgs.addModuleAsFlatItems(self.argLoader.loadAllKernArg(sgprStart, "KernArgAddress", load))
-      if kernel.enabledSetPrioSplitLDS:
-        moduleArgs.add(SSetPrior(prior=1, comment="prioritize init code so as to issue load sooner"))
       moduleArgs.addModuleAsFlatItems(lralwaCode)
       moduleArgs.add(SWaitCnt(lgkmcnt=0, comment="wait for %u bytes of kern args" % self.argLoader.getOffset()))
 
@@ -2202,23 +2200,12 @@ class KernelWriterAssembly(KernelWriter):
     module = Module("lwaUnrollAssignment")
     uReg = tP["gpr"]["uReg2" if kernel["GlobalSplitU"] > 1 else "uReg"]
     module.addComment0("lwaUnrollAssignment%s = %s" % (tP["tensorChar"], vgpr(uReg)))
-    if kernel.enabledSplitLDS and kernel["UnrollMajorLDS%s" % tP["tensorChar"]]:
-      if self.states.inTailLoop:
-        subIterReg = self.vgprPool.checkOut(1, "subIterReg")
-        module.addComment0("Each wg writes 1/%u of G2L data to LDS"%kernel["DepthULdsDivisor"])
-        module.add(VLShiftRightB32(dst=vgpr(subIterReg), shiftHex=log2(kernel["_DepthULds"]), src=vgpr(uReg), comment="sub_G2L_idx = uIdx / DepthU_Compute"))
-        module.add(VAndB32(dst=vgpr(uReg), src0=vgpr(uReg), src1=(kernel["_DepthULds"]-1), comment="unrollIdx = unrollIdx % DepthU_Compute"))
-        tP["gpr"]["subIterReg"] = subIterReg
-      else:
-        module.addComment0("Each thd writes 1/%u of G2L data to LDS"%kernel["DepthULdsDivisor"])
-        module.add(VLShiftRightB32(dst=vgpr(uReg), shiftHex=log2(kernel["DepthULdsDivisor"]), src=vgpr(uReg), comment="sub_G2L_idx = uIdx / DepthULdsDivisor"))
     return module
 
   ##############################################################################
   # Local Write Addresses: First Offset A/B
-  # uDu: which part of G2L buffer to write to LDS
   ##############################################################################
-  def lwaFirstOffset(self, kernel, tP, uDu=0):
+  def lwaFirstOffset(self, kernel, tP):
     module = Module("lwaFirstOffset")
     tc = tP["tensorChar"]
     LdsPad = kernel["LdsPad%s"%tc] if kernel["LdsBlockSizePerPad%s"%tc] == 0 else 0
@@ -2301,20 +2288,6 @@ class KernelWriterAssembly(KernelWriter):
                     src1=vgpr(destVgpr), \
                     comment="Mask load so out-of-gr-tile bounds returns 0"))
         self.vgprPool.checkIn(tmpVgpr)
-
-    elif self.states.inTailLoop and kernel.enabledSplitLDS: # where (DepthU for global read) != (DepthU for compute)
-      # only for TN tensor + TN lds layout
-      assert tP["tlu"] == 0
-      module.add(VCmpEQU32(dst=VCC(), src0=vgpr(tP["gpr"]["subIterReg"]), src1=uDu, comment="if sub_g2l_idx == %u ?"%uDu))
-
-      ldsOOB = self.vgprPool.checkOut(1, "lds OOB addr", self.states.preventVgprOverflowDuringNewTile)
-      module.add(VMovB32(dst=vgpr(ldsOOB), src=hex(self.consts.ldsOOB), comment="lds OOB address"))
-      module.add(VCndMaskB32( \
-                  dst=vgpr(destVgpr), \
-                  src0=vgpr(ldsOOB), \
-                  src1=vgpr(destVgpr), \
-                  comment="Mask threads not belonging to current sub_g2l_idx by assigning OOB"))
-      self.vgprPool.checkIn(ldsOOB)
 
     if kernel["LocalWriteUseSgpr%s"%tc]:
       # TODO: Can refactor code above to Compute this directly:
@@ -2879,10 +2852,8 @@ class KernelWriterAssembly(KernelWriter):
 
   ##############################################################################
   # Open Loop
-  # uDu: 'None' means not generating branching label which decides which part of G2L
-  #      buffer to write to LDS
   ##############################################################################
-  def openLoop(self, kernel, tPA, tPB, loopIdx, uDu=None, noLabelGen=False, beginLabelOnly=False):
+  def openLoop(self, kernel, tPA, tPB, loopIdx, noLabelGen=False, beginLabelOnly=False):
     module = Module("openLoop")
     # TODO - rewrite this function to simplify control-flow between tail-loop / unroll loop
     tailLoop = loopIdx < 0
@@ -2893,8 +2864,8 @@ class KernelWriterAssembly(KernelWriter):
         kernel["ProblemType"]["IndicesSummation"][loopIdx]]
     if not tailLoop and not noLabelGen:
       module.add(Label("openLoop%s"%loopChar, ""))
-    loopLabelBegin = Label("%sLoopBegin%s%s"%("Tail" if tailLoop else "", loopChar, "_G2L%s"%uDu if uDu is not None else "" ), "" )
-    loopLabelEnd = Label("%sLoopEnd%s%s"%("Tail" if tailLoop else "", loopChar, "_G2L%s"%uDu if uDu is not None else ""), "" )
+    loopLabelBegin = Label("%sLoopBegin%s"%("Tail" if tailLoop else "", loopChar), "" )
+    loopLabelEnd = Label("%sLoopEnd%s"%("Tail" if tailLoop else "", loopChar), "" )
 
     if beginLabelOnly:
       # generate only beginLabel, then, return
@@ -2996,10 +2967,8 @@ class KernelWriterAssembly(KernelWriter):
   ##############################################################################
   # Close Loop
   # finalLoop : final unroll loop
-  # uDu: 'None' means not generating branching label which decides which part of G2L
-  #      buffer to write to LDS
   ##############################################################################
-  def closeLoop(self, kernel, tPA, tPB, loopIdx, finalLoop, uDu=None, emitEndLabelOnly=False, oddLabel=False):
+  def closeLoop(self, kernel, tPA, tPB, loopIdx, finalLoop, emitEndLabelOnly=False, oddLabel=False):
     module = Module("closeLoop")
     if emitEndLabelOnly:
       loopIdx = self.states.unrollIdx
@@ -3015,8 +2984,8 @@ class KernelWriterAssembly(KernelWriter):
     if tailLoop:
       loopIdx = self.states.unrollIdx
       loopChar = self.states.indexChars[kernel["ProblemType"]["IndicesSummation"][loopIdx]]
-      loopLabelBegin = Label("TailLoopBegin%s%s"%(loopChar, "_G2L%s"%uDu if uDu is not None else ""), "" )
-      loopLabelEnd = Label("TailLoopEnd%s%s"%(loopChar, "_G2L%s"%uDu if uDu is not None else ""), "" )
+      loopLabelBegin = Label("TailLoopBegin%s"%(loopChar), "" )
+      loopLabelEnd = Label("TailLoopEnd%s"%(loopChar), "" )
       loopLabelEndOddExit = Label("TailLoopEnd%s_oddexit"%(loopChar), "unroll loop odditer exit" )
       loopCounter = self.loopCounter(kernel, loopIdx)
 
@@ -3130,15 +3099,6 @@ class KernelWriterAssembly(KernelWriter):
         # just an exit check, else fall through to the next loop copy
         module.add(SCBranchSCC1(labelName=jumpLabel.getLabelName(), comment="exit Loop%s"%loopChar ))
     else: #finalLoop:
-
-      if tailLoop and kernel.enabledSplitLDS:
-        tailLoopLabelEnd = Label.getFormatting(
-          "TailLoopEnd%s%s"%(loopChar, "_G2L%s"%(kernel["DepthULdsDivisor"]-1) if kernel.enabledSplitLDS else "") )
-        module.add(SCBranchSCC1(labelName=tailLoopLabelEnd, comment="break Loop%s"%loopChar))
-        thresForNextSubLoop = (uDu+1)*(kernel["_DepthULds"])
-        module.add(SCmpGeU32(src0=sgpr("OrigLoopCounter"), src1=thresForNextSubLoop,
-          comment="OrigLoopCounter >= %u (G2L buffer %u/%u)"%(thresForNextSubLoop, uDu, kernel["DepthULdsDivisor"]) ))
-
       module.add(finalJump(labelName=loopLabelBegin.getLabelName(), comment="restart Loop%s"%(loopChar)))
 
       if not tailLoop and loopIdx == self.states.unrollIdx:
@@ -4742,7 +4702,7 @@ class KernelWriterAssembly(KernelWriter):
 
     return (offsetBytes, i, comment)
 
-  def recalcLocalWriteAddresses(self, kernel, tP, uDu):
+  def recalcLocalWriteAddresses(self, kernel, tP):
 
     tc = tP["tensorChar"]
 
@@ -4750,7 +4710,7 @@ class KernelWriterAssembly(KernelWriter):
     module.addComment1("recalculate LocalWriteAddr{}".format(tc))
 
     lwvw = getattr(self, "localWriteWidth{}".format(tc))
-    newInstIdx = self.selectMemoryInstruction("LocalWrite", lwvw*kernel["DepthULdsDivisor"], \
+    newInstIdx = self.selectMemoryInstruction("LocalWrite", lwvw, \
         False, \
         tP["localWrite2Coalesced"], tP["localWrite2Perpendicular"],
         [tP["localWriteStrideTile"], tP["localWriteStrideUnroll"]] )
@@ -4761,7 +4721,7 @@ class KernelWriterAssembly(KernelWriter):
     # local write unroll assignments
     module.add(self.lwaUnrollAssignment(kernel, tP))
     # local write local write first offsets
-    module.add(self.lwaFirstOffset(kernel, tP, uDu))
+    module.add(self.lwaFirstOffset(kernel, tP))
 
     # global read tile assignment
     module.add(self.graTileAssignment(kernel, tP))
@@ -4783,10 +4743,7 @@ class KernelWriterAssembly(KernelWriter):
       # In 1 block MI, it remap localReadAddr in order to let each thread wider local read continuous k
       # this decrease performance since it require more loop to handle continuous k in each thread.
       # recalculate localReadAddr to cancel wider local read in tail loop
-      # TODO: If DepthULdsDivisor>1, local read addr is incremented for each K the loop iterates, which
-      # upon second sub-loop needs to be reset to its original value. Backing up local read address would
-      # be nicer than recomputing them
-      if kernel.enabledSplitLDS or ((self.states.numReadsIterCoalescedA > 1 or self.states.numReadsIterCoalescedB > 1)):
+      if ((self.states.numReadsIterCoalescedA > 1 or self.states.numReadsIterCoalescedB > 1)):
         self.states.numReadsIterCoalescedA = 1
         self.states.numReadsIterCoalescedB = 1
 
@@ -4837,10 +4794,8 @@ class KernelWriterAssembly(KernelWriter):
 
   ##############################################################################
   # Local Write: Do It A/B
-  # uDu: 'None' means to use fractional local write (where not all threads are active)
-  #      when DepthULdsDivisor > 1
   ##############################################################################
-  def localWriteDo(self, kernel, tP, uDu=0):
+  def localWriteDo(self, kernel, tP):
     if not self.do["LocalWrite"]: return "", -1
 
     tc = tP["tensorChar"]
@@ -4898,16 +4853,7 @@ class KernelWriterAssembly(KernelWriter):
             #print("perp:{}/{} para:{}/{} sPerp:{} sPara:{}".format(perp,tP["nrp"],para,tP["nrc"],sPerp,sPara))
             (offset, i, comment) = self.calculateLdsWriteOffset(perp, para, sPerp, sPara, kernel, tP)
 
-            if uDu is None:
-              g2lIdx = int(i * blockWidth)
-            else:
-              # Example: DepthULdsDivisor=2
-              # v0, v1, v2, v3 | v0, v1, v2, v3 | ... ----> unroll dim
-              # -----Thd 0----- -----Thd 1-----   ...
-              # 1st subloop writes v0,v1 to LDS
-              # 2nd subloop writes v2,v3 to LDS
-              g2lIdx = int((i * kernel["DepthULdsDivisor"] + uDu) * blockWidth)
-              #print("uDu=%u, g2lIdx = %u, offset: %u"%(uDu, g2lIdx, offset))
+            g2lIdx = int(i * blockWidth)
 
             # If g2lIdx is already in the dict and blockWidth < 1, the data may
             # be packed into one register.
@@ -4918,7 +4864,6 @@ class KernelWriterAssembly(KernelWriter):
               g2lIdxDict[g2lIdx] = 0
             instHi = g2lIdxDict[g2lIdx]
 
-            # TODO- INT8: check uDu
             if (blockWidth == 0.25) and ((s % 4) == 0):
                 src = "G2L%s+%u" % (tc, g2lIdx)
                 dst = "G2L%s+%u+%u" % (tc, tmpVgprOffset, g2lIdx)
@@ -5883,8 +5828,6 @@ class KernelWriterAssembly(KernelWriter):
 
     # Global Write
     ntStr = ""
-    if kernel.enabledSetPrioSplitLDS:
-      module.add(SSetPrior(prior=1))
     if kernel["NonTemporalD"]%2==1:
       ntStr += " glc"
     if kernel["NonTemporalD"]//2==1:

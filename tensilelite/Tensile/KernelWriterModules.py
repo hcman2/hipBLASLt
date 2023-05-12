@@ -110,7 +110,7 @@ def syncThreads(kernel, archCaps, comment=""):
     if kernel["NumThreads"] > kernel["WavefrontSize"]:
         if archCaps["SeparateVscnt"]:
             imod.add(SWaitCnt(vscnt=0))
-        elif kernel.enabledSplitLDS or kernel["ScheduleIterAlg"] == 2 \
+        elif kernel["ScheduleIterAlg"] == 2 \
           or kernel["PrefetchGlobalRead"] == 2:
             imod.addComment("Skip force waitcnt0")
         elif archCaps["Waitcnt0Disabled"]:

@@ -36,7 +36,7 @@ class SIA3(SIA):
     def __call__(self):
         assert(0)
 
-    def schedIntoIteration(self, writer, kernel, tensorParametersA, tensorParametersB, localWriteEndIter, uDu, firstIter, lastLoop, lastLc, maxVmcnt, globalReadIncACode, globalReadIncBCode):
+    def schedIntoIteration(self, writer, kernel, tensorParametersA, tensorParametersB, localWriteEndIter, firstIter, lastLoop, lastLc, maxVmcnt, globalReadIncACode, globalReadIncBCode):
         # Get schedule information
         if kernel["EnableMatrixInstruction"]:
             numMfmaBetweenLWandBarrier, latencyLeft = getLocalWriteMFMAEnd(writer, kernel, tensorParametersA, tensorParametersB)
@@ -53,7 +53,7 @@ class SIA3(SIA):
 
             AssignGRPMandLWPM(writer, kernel, numLocalWriteModPerMfma)
             localWriteEndIter = fixLocalWriteEndMfmaIndex(writer, kernel, tensorParametersA, tensorParametersB, \
-                globalReadIncACode, globalReadIncBCode, numMfmaBetweenLWandBarrier, uDu, lastLoop)
+                globalReadIncACode, globalReadIncBCode, numMfmaBetweenLWandBarrier, lastLoop)
             numGlobalReadInsPerIter, numLocalWriteModPerIter, numEmptyGlobalReadIncCode = getScheduleParamMfma(writer)
         else:
             numGlobalReadInsPerIter, numLocalWriteModPerIter, numEmptyGlobalReadIncCode = getScheduleParams(kernel)
@@ -88,14 +88,14 @@ class SIA3(SIA):
             startIterItem = numLocalWriteModPerIter - (writer.states.lwStartMfmaIndex % writer.states.numMfmaPerIter) * numLocalWritesPerSched
             schedLocalWrite(writer, kernel, numLocalWriteModPerIter, numLocalWritesPerSched, localWriteEndIter, \
               itemsGRToSchedLater, itemsLWToSched, startIter, readsToWait, readsToWaitNGLL, \
-              uDu, firstIter, lastLc, maxVmcnt, startIterItem)
+              firstIter, lastLc, maxVmcnt, startIterItem)
 
 class SIA2(SIA):
     kernel = {"ScheduleIterAlg": 2}
     def __call__(self):
         assert(0)
 
-    def schedIntoIteration(self, writer, kernel, tensorParametersA, tensorParametersB, localWriteEndIter, uDu, firstIter, lastLoop, lastLc, maxVmcnt, globalReadIncACode, globalReadIncBCode):
+    def schedIntoIteration(self, writer, kernel, tensorParametersA, tensorParametersB, localWriteEndIter, firstIter, lastLoop, lastLc, maxVmcnt, globalReadIncACode, globalReadIncBCode):
         # Get schedule information
         numGlobalReadInsPerIter, numLocalWriteModPerIter, numEmptyGlobalReadIncCode = getScheduleParams(kernel)
         numLocalWritesPerSched = numLocalWriteModPerIter
@@ -116,14 +116,14 @@ class SIA2(SIA):
             readsToWait, readsToWaitNGLL = getReadsToWait(writer, kernel)
             schedLocalWrite(writer, kernel, numLocalWriteModPerIter, numLocalWritesPerSched, localWriteEndIter, \
               itemsGRToSchedLater, itemsLWToSched, startIter, readsToWait, readsToWaitNGLL, \
-              uDu, firstIter, lastLc, maxVmcnt)
+              firstIter, lastLc, maxVmcnt)
 
 class SIA1(SIA):
     kernel = {"ScheduleIterAlg": 1}
     def __call__(self):
         assert(0)
 
-    def schedIntoIteration(self, writer, kernel, tensorParametersA, tensorParametersB, localWriteEndIter, uDu, firstIter, lastLoop, lastLc, maxVmcnt, globalReadIncACode, globalReadIncBCode):
+    def schedIntoIteration(self, writer, kernel, tensorParametersA, tensorParametersB, localWriteEndIter, firstIter, lastLoop, lastLc, maxVmcnt, globalReadIncACode, globalReadIncBCode):
         # Get schedule information
         numGlobalReadInsPerIter, numLocalWriteModPerIter, numEmptyGlobalReadIncCode = getScheduleParams(kernel)
         numLocalWritesPerSched = numLocalWriteModPerIter
@@ -144,7 +144,7 @@ class SIA1(SIA):
             readsToWait, readsToWaitNGLL = getReadsToWait(writer, kernel)
             schedLocalWrite(writer, kernel, numLocalWriteModPerIter, numLocalWritesPerSched, localWriteEndIter, \
               itemsGRToSchedLater, itemsLWToSched, startIter, readsToWait, readsToWaitNGLL, \
-              uDu, firstIter, lastLc, maxVmcnt)
+              firstIter, lastLc, maxVmcnt)
 
 ################################################################################
 ################################################################################
@@ -382,7 +382,7 @@ def getScheduleParamMfma(writer):
     numEmptyGlobalReadIncCode = writer.states.numGlobalReadInsPerMfma - 1
     return numGlobalReadInsPerIter, numLocalWriteModPerIter, numEmptyGlobalReadIncCode
 
-def fixLocalWriteEndMfmaIndex(writer, kernel, tPA, tPB, globalReadIncACode, globalReadIncBCode, numMfmaBetweenLWandBarrier, uDu, lastLoop):
+def fixLocalWriteEndMfmaIndex(writer, kernel, tPA, tPB, globalReadIncACode, globalReadIncBCode, numMfmaBetweenLWandBarrier, lastLoop):
     numMfmaPerIter = writer.states.numMfmaPerIter
     # If numLocalWriteModPerMfma is not multiple of 100,
     # last globalread will be scheduled at lwEndMfmaIndex,
@@ -390,40 +390,7 @@ def fixLocalWriteEndMfmaIndex(writer, kernel, tPA, tPB, globalReadIncACode, glob
     # so we offset lwEndMfmaIndex by 1 mfma
     if kernel["PrefetchGlobalRead"] == 2 and writer.states.numLocalWriteModPerMfma % PRECISION != 0:
         numMfmaBetweenLWandBarrier -= 1
-    def assignParamSplitLds(numMfmaBetweenLWandBarrier):
-        if not kernel.enabledSplitLDS:
-            return numMfmaBetweenLWandBarrier
-        # how many local reads in terms of mfma indices (height)
-        # total number of instructions (total) minus the instructions prefetched outside of loop (spent), divided by mfma bubble (width)
-        issueLatency = max(tPA["localReadInstruction"].issueLatency, tPB["localReadInstruction"].issueLatency) * 2
-        width = writer.states.miLatencyLeft // issueLatency
-        width = max(width, 1)
-        spent = writer.states.numItersPLR * (writer.states.numReadsPerIterA + writer.states.numReadsPerIterB)
-        total = kernel["LoopIters"]//writer.states.numIterPerCoalescedReadA*writer.states.numReadsPerIterA + \
-                kernel["LoopIters"]//writer.states.numIterPerCoalescedReadB*writer.states.numReadsPerIterB
-        height = int(ceil((total-spent)/width))
-        # how many local writes
-        localWritesToSched = writer.codes.localWriteA.countType(LocalWriteInstruction) + \
-                             writer.codes.localWriteB.countType(LocalWriteInstruction)
-        localWritesPerMfma = writer.states.numLocalWriteModPerMfma / PRECISION # was scaled by PRECISION
-        # _numMfmaBetweenLastLWandBarrier: a function of 'spacing', which is num of mfma instructions until local write starts
-        _numMfmaBetweenLastLWandBarrier = lambda spacing : writer.states.barrierMfmaIndex + 1 - ceil(localWritesToSched/localWritesPerMfma) - spacing
-        addrIncToSched = sum(1 for codemod in [globalReadIncACode, globalReadIncBCode] if len(codemod.items()))
-        if uDu < kernel["DepthULdsDivisor"] - 1:
-            if kernel["1LDSBuffer"] and kernel["PrefetchLocalRead"] > 1:
-                # space the stream of local writes so that 1st local write is scheduled after last local read,
-                # but give it 2 mfma's worth of headroom
-                spacing = 2 + height
-            else:
-                # can start ds_write/buffer_load as soon as loop starts, but give it 1 mfma's worth of headroom
-                spacing = 1
-        else:
-            # query how much spacing we have by calling lambda(0), minus the original 'numMfmaBetweenLWandBarrier'
-            # we get the spacing that results in exactly 'numMfmaBetweenLWandBarrier' between last write and barrier
-            spacing = _numMfmaBetweenLastLWandBarrier(0) - numMfmaBetweenLWandBarrier + addrIncToSched - 1
-        return max(0, _numMfmaBetweenLastLWandBarrier(spacing))
 
-    numMfmaBetweenLWandBarrier = assignParamSplitLds(numMfmaBetweenLWandBarrier)
     writer.states.lwEndMfmaIndex = max(writer.states.barrierMfmaIndex - numMfmaBetweenLWandBarrier,0) if writer.states.numItersPLR else numMfmaPerIter*kernel["LoopIters"] - 1
     # adjust lwEndMfmaIndex for the following cases
     #  1) PGR=2
@@ -471,13 +438,10 @@ def prepareGRInstToSched(writer, kernel):
 
     # Add all loads from middle as individual schedulable items
     # when using PGR2, put global read instruction right after corresponding localWrite instruction
-    if kernel["PrefetchGlobalRead"] == 2 or kernel.enabledSplitLDS:
+    if kernel["PrefetchGlobalRead"] == 2:
         itemsGRToSched =  []
         itemsGRToSchedLater = list(writer.codes.globalReadA.middle.items()) + \
                          list(writer.codes.globalReadB.middle.items())
-        if kernel.enabledSetPrioSplitLDS and itemsGRToSchedLater:
-            itemsGRToSchedLater.insert(1, SSetPrior(prior=3, comment="top priority for load"))
-            itemsGRToSchedLater.insert(len(itemsGRToSchedLater), SSetPrior(prior=0))
     else:
         itemsGRToSched =  list(writer.codes.globalReadA.middle.items()) + \
                         list(writer.codes.globalReadB.middle.items())
@@ -714,7 +678,7 @@ def getReadsToWait(writer, kernel):
 
 def schedLocalWrite(writer, kernel, numLocalWriteModPerIter, numLocalWritesPerSched, localWriteEndIter, \
   itemsGRToSchedLater, itemsLWToSched, startIter, readsToWait, readsToWaitNGLL, \
-  uDu, firstIter, lastLc, maxVmcnt, startIterItem = None):
+  firstIter, lastLc, maxVmcnt, startIterItem = None):
     # schedule here
     localwriteCnt = 0
     for u in range(startIter, localWriteEndIter+1):
@@ -743,15 +707,12 @@ def schedLocalWrite(writer, kernel, numLocalWriteModPerIter, numLocalWritesPerSc
                 # TODO - can schedule these writes across iters, should figure this out above
                 readsToWait = readsToWait - 1
                 readsToWaitNGLL = readsToWaitNGLL - 1
-                if uDu < kernel["DepthULdsDivisor"]-1:
-                    imod.addComment0("no wait vmcnt except for in the last subLdsLoop")
-                else:
-                    imod.add(SWaitCnt(lgkmcnt=-1, \
-                        vmcnt=min(maxVmcnt, readsToWait + readsToWaitAdjustForStoreC), vscnt=-1, \
-                        comment="wait for global read before writing to local"))
-                    imodNGLL.add(SWaitCnt(lgkmcnt=-1, \
-                        vmcnt=min(maxVmcnt, readsToWaitNGLL + readsToWaitAdjustForStoreC), vscnt=-1, \
-                        comment="wait for global read before writing to local"))
+                imod.add(SWaitCnt(lgkmcnt=-1, \
+                    vmcnt=min(maxVmcnt, readsToWait + readsToWaitAdjustForStoreC), vscnt=-1, \
+                    comment="wait for global read before writing to local"))
+                imodNGLL.add(SWaitCnt(lgkmcnt=-1, \
+                    vmcnt=min(maxVmcnt, readsToWaitNGLL + readsToWaitAdjustForStoreC), vscnt=-1, \
+                    comment="wait for global read before writing to local"))
             # PK and StoreCUnroll is removed so you cannot find any HolderContainer in s_waitcnt
             if kernel["PrefetchGlobalRead"]==2:
                 hasHolder, wcList = hasHolderInWaitCnt(item)

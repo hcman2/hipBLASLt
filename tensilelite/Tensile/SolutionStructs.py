@@ -1947,9 +1947,6 @@ class Solution(collections.abc.Mapping):
               or (state["PrefetchGlobalRead"] > 1 and \
                   (state["ProblemType"]["DataType"].isDouble() or state["ProblemType"]["DataType"].isDoubleComplex())))):
         state["ExpandPointerSwap"] = 0
-      # EPS not supported with SplitLDS yet
-      if state["DepthULdsDivisor"] > 1:
-        state["ExpandPointerSwap"] = 0
 
     #print("PackedC0IdxChars", state["PackedC0IdxChars"])
     #print("PackedC1IdxChars", state["PackedC1IdxChars"])
@@ -2170,10 +2167,10 @@ class Solution(collections.abc.Mapping):
         depthU = max(depthU, numOfWaves)
     else:
       depthU = userDepthU
-      depthULds = userDepthU//state["DepthULdsDivisor"]
+      depthULds = userDepthU
       maxDepthU = userDepthU
 
-    state["_DepthULds"] = state["DepthU"]//state["DepthULdsDivisor"] # internal
+    state["_DepthULds"] = state["DepthU"] # internal
 
     ########################################
     # Search DepthU
@@ -2322,7 +2319,7 @@ class Solution(collections.abc.Mapping):
           continue
         else: # use this found value
           state["DepthU"] = depthU
-          state["_DepthULds"] = depthU//state["DepthULdsDivisor"]
+          state["_DepthULds"] = depthU
           break
 
       # this depthU not valid
@@ -2330,7 +2327,7 @@ class Solution(collections.abc.Mapping):
         # keep looking
         if depthU < maxDepthU:
           depthU += 2
-          depthULds = depthU//state["DepthULdsDivisor"]
+          depthULds = depthU
           continue
         # give up
         else:
@@ -2850,21 +2847,6 @@ class Solution(collections.abc.Mapping):
             not state["InnerUnroll"] >= state["LocalReadVectorWidth"] // state["MIInputPerThread"]:
           reject(state, "wider localRead only support ClusterLocalRead or (InnerUnroll > WiderLocalReadxN)")
 
-    if state["DepthULdsDivisor"] > 1:
-      if state["PrefetchGlobalRead"] == 2:
-        reject(state, "DepthULdsDivisor > 1 does not support PrefetchGlobalRead=2")
-      if state["ScheduleIterAlg"] != 3:
-        reject(state, "DepthULdsDivisor > 1 does not support SchedulIterAlg other than 3")
-      if state["DirectToLds"] == True:
-        reject(state, "DepthULdsDivisor > 1 does not support DirectToLds")
-      if state["ProblemType"]["TLUA"] or state["ProblemType"]["TLUA"] or not state["TransposeLDS"]:
-        reject(state, "DepthULdsDivisor > 1: Only works with TN problem layout and TransposeLDS")
-      if state["PrefetchGlobalRead"]==1 and state["PrefetchLocalRead"]==0:
-        reject(state, "PGR1 + PLR0 in SplitLDS requires double G2L buffer which is yet to be implemented")
-      if state["ProblemType"]["DataType"].numRegisters()*state["GlobalReadVectorWidth"] < state["DepthULdsDivisor"]:
-        reject(state, "SplitLDS requires wider GlobalReadVectorWidth; needs RegisterPerElem (%f) * GRVW (%u) >= DepthULdsDivisor (%u)"%
-          (state["ProblemType"]["DataType"].numRegisters(),state["GlobalReadVectorWidth"],state["DepthULdsDivisor"]))
-
     if state["GlobalReadPerMfma"] > 1 and state["PrefetchGlobalRead"] == 2:
       reject(state, "GlobalReadPerMfma need to be 1 if PGR2")
 
@@ -3259,14 +3241,3 @@ class Solution(collections.abc.Mapping):
     if result is NotImplemented:
       return result
     return not result
-
-  @property
-  def enabledSplitLDS(self):
-    return self["DepthULdsDivisor"] > 1
-
-  @property
-  def enabledSetPrioSplitLDS(self):
-    # The interaction between SplitLDS's priority policy and StorePriorityOpt's is yet to be
-    # investigated. For now, disable SplitLDS's priority policy when StorePriorityOpt is present
-    # TODO: determine suitable priority policy when both are present
-    return self.enabledSplitLDS and not self["StorePriorityOpt"]

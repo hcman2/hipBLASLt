@@ -369,8 +369,6 @@ class GlobalWriteBatchWriter:
 
     ########################################
     # AccVgpr read
-    if self.kernel.enabledSetPrioSplitLDS:
-      module.add(SSetPrior(0))
     if self.codeAccVgprRead is not None:
       regsPerScalar = self.parentWriter.states.bpeCinternal // self.parentWriter.states.bpr # register per scalar
       # loop over store instructions within one batch
