@@ -1861,6 +1861,12 @@ class Solution(collections.abc.Mapping):
     Solution.checkAndAssignWaveSeparateGlobalRead(state, 'A')
     Solution.checkAndAssignWaveSeparateGlobalRead(state, 'B')
 
+    if state["NonTemporal"] != -1:
+      state["NonTemporalA"] = state["NonTemporal"]
+      state["NonTemporalB"] = state["NonTemporal"]
+      state["NonTemporalC"] = state["NonTemporal"]
+      state["NonTemporalD"] = state["NonTemporal"]
+
     # Init vars early since there are early-exit return statements below
     state["DirectToLdsA"] = False
     state["DirectToLdsB"] = False
