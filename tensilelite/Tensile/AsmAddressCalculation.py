@@ -473,7 +473,7 @@ class AddrCalculation:
                 strideW1 = "Size%s" % "I" if index == 0 else ("J" if index == 1 else (kw.states.indexChars[index]))
 
                 module.addComment1("shift vector components d1")
-                vw = kernel["GlobalLoadVectorWidthB"]
+                vw = kernel["GlobalReadVectorWidthB"]
                 vTmp1 = tmpVgpr
                 vTmp2 = tmpVgpr+1
                 sTmp1 = tmpS01

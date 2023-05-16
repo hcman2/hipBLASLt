@@ -192,7 +192,6 @@ globalParameters["Device"] = 0                    # select hip device or opencl 
 # shouldn't need to change
 globalParameters["DeviceLDS"] = 65536             # LDS bytes per CU, for computing occupancy
 globalParameters["MaxLDS"] = 65536                # max LDS a kernel should attempt to use
-globalParameters["MaxDepthU"] = 256               # max DepthU value to allow
 globalParameters["ShortNames"] = False            # on windows kernel names can get too long; =True will convert solution/kernel names to serial ids
 globalParameters["MergeFiles"] = True             # F=store every solution and kernel in separate file; T=store all solutions in single file
 globalParameters["NumMergedFiles"] = 1            # The number of files that kernels should be split between when merging
@@ -305,8 +304,7 @@ validMacroTileSides = [1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 6, 12, 24, 4
 validMacroTiles = []
 validISA = [(0,0,0)]
 validISA.extend(globalParameters["SupportedISA"])
-depthUs = list(range(-16, 0))
-depthUs.extend(list(range(2,512+1,1)))
+depthUs = list(range(2,512+1,1))
 for i in validMacroTileSides:
   for j in validMacroTileSides:
     validMacroTiles.append([i, j])
@@ -518,7 +516,7 @@ validParameters = {
     # local write offset with an SGPR.
     # For an 8x8 TT with PrefetchGlobalRead=1 this can save 33 VGPRs.
     #    - Requirements for DirectToLds=1:
-    #      GlobalLoadVectorWidth = 1/2/4
+    #      GlobalReadVectorWidth = 1/2/4
     #      TransposeLDS = 1 for TLU=0 case
     # DirectToLds support for x2/x4 (1st part of async_copy() support)
     "DirectToLds":                [ False, True ],
@@ -803,7 +801,8 @@ validParameters = {
     # NOTE: for input bpe=32, max GRVW is 4  (to fit dwordx4) (FP32), min GRVW is 1 (dword)
     #                 bpe=16, max GRVW is 8  (to fit dwordx4) (FP16), min GRVW is 2 (dword)
     #                 bpe=8,  max GRVW is 16 (to fit dwordx4) (INT8), min GRVW is 4 (dword)
-    "GlobalReadVectorWidth":      [ -1, 1, 2, 3, 4, 6, 8, 16 ],
+    "GlobalReadVectorWidthA":      [ -1, 1, 2, 3, 4, 6, 8, 16 ],
+    "GlobalReadVectorWidthB":      [ -1, 1, 2, 3, 4, 6, 8, 16 ],
 
     # Controls desired width (#elements) for loads from LDS -> VGPR.
     # -1 : Set LocalReadVectorWidth =  VectorWidth
@@ -954,7 +953,8 @@ defaultBenchmarkCommonParameters = [
     {"VectorWidthB":              [ -1 ] },
     {"VectorStore":               [ -1 ] },
     {"StoreVectorWidth":          [ -1 ] },
-    {"GlobalReadVectorWidth":     [ -1 ] },
+    {"GlobalReadVectorWidthA":     [ -1 ] },
+    {"GlobalReadVectorWidthB":     [ -1 ] },
     {"LocalReadVectorWidth":      [ -1 ] },
     {"WaveSeparateGlobalReadA":   [ 0 ] },
     {"WaveSeparateGlobalReadB":   [ 0 ] },
@@ -999,7 +999,7 @@ defaultBenchmarkCommonParameters = [
     {"WavefrontSize":             [ 64 ]},
     {"MatrixInstruction":         [ [] ] },
     {"1LDSBuffer":                [ 0 ] },
-    {"DepthU":                    [ -1 ] },
+    {"DepthU":                    [ 16 ] },
     {"NonTemporalE":              [ 0 ] },
     {"NonTemporalD":              [ 0 ] },
     {"NonTemporalC":              [ 0 ] },

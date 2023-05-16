@@ -316,8 +316,8 @@ def getNumLocalWritePerMfma(writer, kernel, lwStartMfmaIndex):
     if lwStartMfmaIndex > writer.states.lwEndMfmaIndex:
         lwStartMfmaIndex = writer.states.lwEndMfmaIndex
     numMfmaCanSched = writer.states.lwEndMfmaIndex - lwStartMfmaIndex + 1
-    numLoadsA = kernel["DepthU"]*kernel["MacroTileA"]//kernel["GlobalLoadVectorWidthA"]//kernel["NumThreads"]
-    numLoadsB = kernel["DepthU"]*kernel["MacroTileB"]//kernel["GlobalLoadVectorWidthB"]//kernel["NumThreads"]
+    numLoadsA = kernel["DepthU"]*kernel["MacroTileA"]//kernel["GlobalReadVectorWidthA"]//kernel["NumThreads"]
+    numLoadsB = kernel["DepthU"]*kernel["MacroTileB"]//kernel["GlobalReadVectorWidthB"]//kernel["NumThreads"]
     writesToSched = (numLoadsA + numLoadsB - 1) * PRECISION
     oldValue = 0
     newValue = PRECISION

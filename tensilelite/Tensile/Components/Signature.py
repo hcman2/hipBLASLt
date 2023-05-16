@@ -152,8 +152,8 @@ class SignatureCOV3(Signature):
                                 sg=[kernel["SubGroup0"], kernel["SubGroup1"]],
                                 vwA=kernel["VectorWidthA"],
                                 vwB=kernel["VectorWidthB"],
-                                glvwA=kernel["GlobalLoadVectorWidthA"],
-                                glvwB=kernel["GlobalLoadVectorWidthB"],
+                                glvwA=kernel["GlobalReadVectorWidthA"],
+                                glvwB=kernel["GlobalReadVectorWidthB"],
                                 d2lA=kernel["DirectToLdsA"],
                                 d2lB=kernel["DirectToLdsB"],
                                 useSgprForGRO=kernel["_UseSgprForGRO"])
@@ -166,7 +166,7 @@ class SignatureCOV3(Signature):
         signature.addDescriptionBlock("SubGroup= %u x %u" % (sg[0], sg[1]) )
         signature.addDescriptionBlock("VectorWidthA=%u" % vwA )
         signature.addDescriptionBlock("VectorWidthB=%u" % vwB )
-        signature.addDescriptionBlock("GlobalLoadVectorWidthA=%u, GlobalLoadVectorWidthB=%u" % (glvwA, glvwB) )
+        signature.addDescriptionBlock("GlobalReadVectorWidthA=%u, GlobalReadVectorWidthB=%u" % (glvwA, glvwB) )
         signature.addDescriptionBlock("DirectToLdsA=%s" % d2lA )
         signature.addDescriptionBlock("DirectToLdsB=%s" % d2lB )
         signature.addDescriptionBlock("UseSgprForGRO=%s" % useSgprForGRO )

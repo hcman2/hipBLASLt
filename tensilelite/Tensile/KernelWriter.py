@@ -2044,7 +2044,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
       # need to unroll tail loop for the following cases
       mEnd = 1
       if kernel["DirectToLds"] and kernel["EnableMatrixInstruction"] and kernel["InnerUnroll"] == 1 and\
-            (kernel["GlobalLoadVectorWidthA"] * self.states.bpeAB > 4 or kernel["GlobalLoadVectorWidthB"] * self.states.bpeAB > 4) and \
+            (kernel["GlobalReadVectorWidthA"] * self.states.bpeAB > 4 or kernel["GlobalReadVectorWidthB"] * self.states.bpeAB > 4) and \
             kernel["DepthU"] // kernel["MatrixInstK"] > 2:
         mEnd = kernel["DepthU"] // (kernel["MatrixInstK"] * 2)
 
@@ -2309,8 +2309,8 @@ class KernelWriter(metaclass=abc.ABCMeta):
       self.states.numVgprBufferPackB = self.states.numItersPLR + 1
 
     # TODO load sub-vector
-    vwa = kernel["GlobalLoadVectorWidthA"]
-    vwb = kernel["GlobalLoadVectorWidthB"]
+    vwa = kernel["GlobalReadVectorWidthA"]
+    vwb = kernel["GlobalReadVectorWidthB"]
 
     if kernel["SourceSwap"] and not kernel["UnrollMajorLDSA"]:
       self.states.lrvwTileA = kernel["VectorWidthA"]
@@ -2389,7 +2389,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
         numWritesCoalVecComp = vw
         numWritesPerpVecComp = 1
       else: # TN yes transpose
-        writeTileDimComponents = kernel["GlobalReadVectorWidth"] > 1 # Components
+        writeTileDimComponents = True
         numWritesCoalVecComp = 1
         numWritesPerpVecComp = vw
 
@@ -2452,8 +2452,8 @@ class KernelWriter(metaclass=abc.ABCMeta):
     # Gives pointer shift some room to move left, even into the previous macro-tile
     # This slightly reduces the range of the GRO since they have to include the offset
     # Pointer shift still cannot be used with very small matrices < GRVW
-    self.states.srdShiftLeft["A"] = kernel["GlobalLoadVectorWidthA"]
-    self.states.srdShiftLeft["B"] = kernel["GlobalLoadVectorWidthB"]
+    self.states.srdShiftLeft["A"] = kernel["GlobalReadVectorWidthA"]
+    self.states.srdShiftLeft["B"] = kernel["GlobalReadVectorWidthB"]
 
     # checkGRO requires useSgprForGRO=0 so that code allocates and uses
     # the VGPRs that are used for the GRO offset checking
@@ -2635,7 +2635,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
     self.states.a.numVgprG2L = 0
     if not kernel["DirectToLdsA"] or self.do["KeepDirectToLdsAlloc"]:
       self.states.a.numVgprG2L = roundUp((kernel["NumLoadsCoalescedA"] * kernel["NumLoadsPerpendicularA"] * \
-        kernel["GlobalLoadVectorWidthA"] * tensorParametersA["bpe"]) / (float)(self.states.bpr))
+        kernel["GlobalReadVectorWidthA"] * tensorParametersA["bpe"]) / (float)(self.states.bpr))
       if self.states.archCaps["HasEccHalf"]:
         tpA = self.states.bpr if tensorParametersA["bpe"] * vwa < self.states.bpr else tensorParametersA["bpe"] * vwa
         self.states.a.numVgprG2LAllocated = roundUp((kernel["NumLoadsCoalescedA"] * kernel["NumLoadsPerpendicularA"] * \
@@ -2648,7 +2648,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
     self.states.b.numVgprG2L = 0
     if not kernel["DirectToLdsB"] or self.do["KeepDirectToLdsAlloc"]:
       self.states.b.numVgprG2L = roundUp((kernel["NumLoadsCoalescedB"] * kernel["NumLoadsPerpendicularB"] * \
-        kernel["GlobalLoadVectorWidthB"] * tensorParametersB["bpe"]) / (float)(self.states.bpr))
+        kernel["GlobalReadVectorWidthB"] * tensorParametersB["bpe"]) / (float)(self.states.bpr))
       if self.states.archCaps["HasEccHalf"]:
         tpB = self.states.bpr if tensorParametersB["bpe"] * vwb < self.states.bpr else tensorParametersB["bpe"] * vwb
         self.states.b.numVgprG2LAllocated = roundUp((kernel["NumLoadsCoalescedB"] * kernel["NumLoadsPerpendicularB"] * \
@@ -2680,7 +2680,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
     ####################################
     # num vgprs: global read addresses
     numGlobalReadsA = kernel["NumLoadsCoalescedA"] \
-        * kernel["NumLoadsPerpendicularA"] * kernel["GlobalLoadVectorWidthA"]
+        * kernel["NumLoadsPerpendicularA"] * kernel["GlobalReadVectorWidthA"]
     numGlobalReadInstructionsA = (numGlobalReadsA * tensorParametersA["bpe"])//\
         (tensorParametersA["globalReadInstruction"].blockWidth * 4)
 
@@ -2690,7 +2690,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
       numVgprGlobalReadAddressesA = numGlobalReadInstructionsA * self.states.rpga
 
     numGlobalReadsB = kernel["NumLoadsCoalescedB"] \
-        * kernel["NumLoadsPerpendicularB"] * kernel["GlobalLoadVectorWidthB"]
+        * kernel["NumLoadsPerpendicularB"] * kernel["GlobalReadVectorWidthB"]
     numGlobalReadInstructionsB = (numGlobalReadsB * tensorParametersB["bpe"])// \
         (tensorParametersB["globalReadInstruction"].blockWidth * 4)
     if kernel["BufferLoad"]:
@@ -3243,7 +3243,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
     tP["nrpv"] = itP[cM].numReadsPerpVecComp                     # number of vector components along perpendicular dimension
     tP["nwcv"] = itP[cM].numWritesCoalVecComp                    # number of vector component writes along coalesced dimension
     tP["nwpv"] = itP[cM].numWritesPerpVecComp                    # number of vector component writes along perpendicular dimension
-    tP["glvw"] = kernel["GlobalLoadVectorWidth%s"%cM]
+    tP["glvw"] = kernel["GlobalReadVectorWidth%s"%cM]
     tP["wtc"] = itP[cM].writeTileDimComponents                   # write vector components along tile dimension
     tP["idx"] = kernel["ProblemType"]["Index%d"%tP["tensorIdx"]] # index 0 is tile dimension belonging to A. Note 'idx' may not be in tP['ia'].
     tP["NonTemporal"] = kernel["NonTemporal%s"%cM]               # non-temporal read type

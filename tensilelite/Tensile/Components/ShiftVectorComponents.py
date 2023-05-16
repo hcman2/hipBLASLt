@@ -56,7 +56,7 @@ class ShiftVectorComponentsMFMA(ShiftVectorComponents):
             we have numSubOutputGroupsPerWave0 which is 4 (kernel[tP["mt"]](64) // numSubOutputPerWave0(8))
 
             So we do shift back by below algorithm.
-            1. check if M_size % GlobalLoadVectorWidth != 0, return if == 0
+            1. check if M_size % GlobalReadVectorWidth != 0, return if == 0
             2. decide which subgroup we need to shift, M_size(3) means 3/8 = group 0
             3. decide which thread we need to shift, we have different groups of thread, (0-31) for first group, (32-63) for second group.
             4. decide which shift block (subTile1) we want to shift. for ex [0-1], [1-2], we want to shift second subtile
@@ -208,7 +208,7 @@ class ShiftVectorComponentsMFMA(ShiftVectorComponents):
 
             # rReg : reminder of M_size % vectorwidth
             # decide to jump to block which handle this case, M_size % vector width
-            module.addComment1("rReg : reminder of M_size % GlobalLoadVectorWidth")
+            module.addComment1("rReg : reminder of M_size % GlobalReadVectorWidth")
             rReg = writer.vgprPool.checkOut(1)
             module.add(vectorStaticRemainder(dummy, rReg, wgMT, glvw, tmpVgprRes, tmpSgprInfo))
             for r in range(1, glvw):

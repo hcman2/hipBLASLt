@@ -64,7 +64,7 @@ class LocalReadMFMA(LocalRead):
         tileStride       = 1
         UnrollStride     = kernel["MacroTile%s" % tP["tensorChar"]] + LdsPad
         if kernel["UnrollMajorLDS%s" % tP["tensorChar"]]:
-            tileStride   = kernel["_DepthULds"] + LdsPad
+            tileStride   = kernel["DepthU"] + LdsPad
             UnrollStride = 1
 
         numVectorsPerTile = kernel["MIWaveTile"][tile01] // vectorWidth
@@ -149,7 +149,7 @@ class LocalReadMFMA(LocalRead):
 
                     for oIdx in range(0, numOffsets):
                         if (kernel["DirectToLds%s" % tP["tensorChar"]] and  \
-                            kernel["GlobalLoadVectorWidth%c"%tc] * tP["bpe"] > 4):
+                            kernel["GlobalReadVectorWidth%c"%tc] * tP["bpe"] > 4):
                           # directToLds special case
                           divVal = 4 if kernel["ProblemType"]["DataType"].isDoubleComplex() else 2
                           rIdxMod = rIdx % divVal
@@ -164,7 +164,7 @@ class LocalReadMFMA(LocalRead):
                             offset_val = offset_val + (offset_val // kernel["LdsBlockSizePerPad%s"%tc]) * kernel["LdsPad%s"%tc] * tP["bpe"]
                         offset_val = offset_val + tP["localReadSwapByteOffset"]
                         if (kernel["DirectToLds%s" % tc] and  \
-                            kernel["GlobalLoadVectorWidth%c"%tc] * tP["bpe"] > 4):
+                            kernel["GlobalReadVectorWidth%c"%tc] * tP["bpe"] > 4):
 
                           # another address conversion for DirectToLds + NumLoadsCoalesced > 1
                           dummy, offset_val = writer.lraOffsetConversionForDTLandNLC(kernel, tP, offset_val)
@@ -176,11 +176,11 @@ class LocalReadMFMA(LocalRead):
                           bit3 = offset_val & 8
                           bit4 = offset_val & 16
                           bit5 = offset_val & 32
-                          if (kernel["GlobalLoadVectorWidth%s"%tc] * tP["bpe"] == 8):
+                          if (kernel["GlobalReadVectorWidth%s"%tc] * tP["bpe"] == 8):
                             # dword_x2 case
                             # (bit2<<3) | (bit3 >>1) | (bit4>>1) | (bit5>>1)
                             newVal = (bit2<<3) | (bit3 >>1) | (bit4>>1) | (bit5>>1)
-                          else:  #if (kernel["GlobalLoadVectorWidth%s"%tc] * tP["bpe"] == 16):  # most preferred case
+                          else:  #if (kernel["GlobalReadVectorWidth%s"%tc] * tP["bpe"] == 16):  # most preferred case
                             # dword_x4 case
                             # (bit2<<3) | (bit3 <<1) | (bit4>>2) | (bit5>>2)
                             newVal = (bit2<<3) | (bit3 <<1) | (bit4>>2) | (bit5>>2)
