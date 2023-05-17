@@ -2945,10 +2945,20 @@ class Solution(collections.abc.Mapping):
         reject("B2B Gemm only support TLUB == false")
       if state["MacroTile1"] != 256 and state["MacroTile1"] != 128 and state["MacroTile1"] != 64:
         reject("B2B Gemm only support MT1 == 64, 128, or 256")
-      state["b2bGemmDepthU"] = 32 # 16 or 32 is recommanded
+      #state["b2bGemmDepthU"] = state["DepthU"]
+      #state["b2bGemmLdsBPad"] = state["LdsPadB"]
+      #state["b2bGemmLdsAPad"] = state["LdsPadA"]
+      #state["b2bGemm1LDSBuffer"] = state["1LDSBuffer"]
+
+      state["b2bGemmDepthU"] = 16 # 16 or 32 is recommanded
       state["b2bGemmLdsBPad"] = 0
-      b2bGEMMExtraLdsElementsForB1 = (state["b2bGemmDepthU"] + state["b2bGemmLdsBPad"] )* state["MacroTile1"]
       state["b2bGemmLdsAPad"] = 4
+      state["b2bGemm1LDSBuffer"] = 1
+      if state["ScheduleIterAlg"] != 3:
+        state["b2bGemm1LDSBuffer"] = 1
+      
+      b2bGEMMNumLDSB1Buffer = 1 if state["b2bGemm1LDSBuffer"] else 2
+      b2bGEMMExtraLdsElementsForB1 = (state["b2bGemmDepthU"] + state["b2bGemmLdsBPad"] )* state["MacroTile1"] * b2bGEMMNumLDSB1Buffer
       b2bGEMMLdsAPad = state["b2bGemmLdsAPad"]
       b2bGEMMNumElementsPerWorkGroup = (state["MacroTile0"]+b2bGEMMLdsAPad)*state["MacroTile1"]
       b2bGEMMLdsNumElements = b2bGEMMNumElementsPerWorkGroup + b2bGEMMExtraLdsElementsForB1
