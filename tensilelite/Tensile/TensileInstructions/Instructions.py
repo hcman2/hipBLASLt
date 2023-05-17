@@ -2226,3 +2226,9 @@ class VNop(Instruction):
 
     def __str__(self) -> str:
         return self.formatWithComment(self.instStr)
+
+# VSwap
+class VSwapB32(CommonInstruction):
+    def __init__(self, dst, src, comment="") -> None:
+        super().__init__(InstType.INST_B32, dst, [src], None, None, comment)
+        self.setInst("v_swap_b32")
