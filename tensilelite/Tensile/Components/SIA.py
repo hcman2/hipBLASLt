@@ -252,7 +252,6 @@ def getLocalWriteMFMAStart(writer, kernel, tensorParametersA, tensorParametersB,
                 else:
                     numHalfReadsB = (writer.states.numReadsPerUnrollB//2)*kernel["InnerUnroll"]*kernel["MIWaveTileB"]
                 numHalfReads = numHalfReadsA + numHalfReadsB
-                numHalfReads = (writer.states.numReadPerVectorA//2)*kernel["InnerUnroll"]*kernel["MIWaveTileA"] + (writer.states.numReadsPerUnrollB//2)*kernel["InnerUnroll"]*kernel["MIWaveTileB"]
                 numMfmaForHalfRead = 1
                 latencyLeft = writer.states.miLatencyLeft
                 for i in range(numHalfReads):
