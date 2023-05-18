@@ -47,8 +47,8 @@ class ComputeStoreVgprsMFMA(ComputeStoreVgprs):
         # writer.vgprs.coutRowPtrD : D buffer coulmn offset
 
         # alloc resources
-        tid0 = writer.vgprPool.checkOut(1)
-        tid1 = writer.vgprPool.checkOut(1)
+        tid0 = writer.vgprPool.checkOut(1, "coord0")
+        tid1 = writer.vgprPool.checkOut(1, "coord1")
         if kernel["BufferStore"]:
             writer.vgprs.cinRowPtr   = writer.vgprPool.checkOut(1, "cinRowPtr")
             writer.vgprs.coutRowPtrD  = writer.vgprPool.checkOut(1, "coutRowPtrD")
@@ -57,7 +57,7 @@ class ComputeStoreVgprsMFMA(ComputeStoreVgprs):
             if writer.states.useBias == DataDirection.WRITE and (not kernel["WorkGroupReduction"]) and kernel["ProblemType"]["BiasSrc"] == "D":
                 writer.vgprs.coutRowPtrBias = writer.vgprPool.checkOut(1, "coutRowPtrBias")
 
-        wave_id = writer.vgprPool.checkOut(1)
+        wave_id = writer.vgprPool.checkOut(1, "tmpWaveID")
 
         tmpVgpr0 = writer.vgprPool.checkOut(1,"tmpVgpr0")
         tmpVgpr1 = writer.vgprPool.checkOutAligned(2,2,"tmpVgpr1")

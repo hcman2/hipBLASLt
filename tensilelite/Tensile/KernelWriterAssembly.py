@@ -2541,12 +2541,13 @@ class KernelWriterAssembly(KernelWriter):
   ##############################################################################
   def initC(self, kernel):
     module = Module("initC")
-    module.addComment1("initC: remove C-tile %u-%u from pool"%(self.states.c.startVgprValu, self.states.c.startVgprValu+self.states.c.numVgprValu))
     self.vgprPool.remove(self.states.c.startVgprValu, self.states.c.numVgprValu, "ValuC")
+    module.addComment1("initC: remove ValuC vgpr buffer [%u...%u) from pool"%(self.states.c.startVgprValu, self.states.c.startVgprValu+self.states.c.numVgprValu))
     numAccvgprs = self.states.totalAgprs
     self.agprPool.remove(0, numAccvgprs, "ValuC")
-    module.addComment1("initC: remove AB-tile %u-%u from pool"%(self.states.a.startVgprValu , self.states.lastValuAB))
+    module.addComment1("initC: remove acc vgpr buffer [%u...%u) from pool"%(0, numAccvgprs))
     self.vgprPool.remove(self.states.a.startVgprValu , self.states.lastValuAB - self.states.a.startVgprValu , "ValuAB")
+    module.addComment1("initC: remove ValuA/B vgpr buffer [%u...%u) from pool"%(self.states.a.startVgprValu , self.states.lastValuAB))
     numCVgpr = max(self.states.c.numVgprValu, numAccvgprs)
 
     if kernel["LdsInitCVgprs"]:
@@ -3228,6 +3229,8 @@ class KernelWriterAssembly(KernelWriter):
       vbegin = self.states.a.startVgprValu
       vsize = self.states.bias.startVgprValu - vbegin
       self.vgprPool.add(vbegin, vsize, "free vgpr except sum K")
+      module.addComment0("endSummation: add vgpr [%u...%u) to pool" % \
+                        (vbegin, vbegin+vsize))
       # Update vbegin and vsize
       vbegin = self.states.bias.startVgprValu
       vsize = self.states.lastVgprForReads - vbegin
@@ -3237,7 +3240,7 @@ class KernelWriterAssembly(KernelWriter):
 
     self.vgprPool.add(vbegin, vsize, "endSummation")
     module.addComment0("endSummation: add vgpr [%u...%u) to pool" % \
-            (vbegin, vbegin+vsize))
+                      (vbegin, vbegin+vsize))
 
     lastRegTag=None
     for i in range(self.states.lastPostLoopSgpr, self.sgprPool.size()):
@@ -3413,8 +3416,6 @@ class KernelWriterAssembly(KernelWriter):
         # replace 0 for same thread
         if numMIInput > 1:
           abReg   = self.vgprPool.checkOutAligned(vgprPerInput, 2 if vgprPerInput>1 else 1, "abReg")
-          tmpVgpr = self.vgprPool.checkOutAligned(2,2,"tmpVgpr")
-          dummy   = self.vgprPool.checkOut(1,"dummy")
           shiftK.add(VSubU32(dst=vgpr(kReg), src0=sgpr(loopCounterName), src1=vgpr(kReg), comment="get distance between size and k index"))
           shiftK.add(VCmpLtI32(dst=sgpr(tmpSgpr,2), src0=vgpr(kReg), src1=numMIInput, comment="set partial 0 if distance less than input per thread"))
           shiftK.add(SAndB32(dst=sgpr(tmpSgpr+2), src0=sgpr(loopCounterName), src1=numMIInput-1, comment="get inputs for edge thread"))
@@ -4742,7 +4743,7 @@ class KernelWriterAssembly(KernelWriter):
       # it do 1 iteration each loop in tail loop, and is no use to wider local read next iteration.
       # In 1 block MI, it remap localReadAddr in order to let each thread wider local read continuous k
       # this decrease performance since it require more loop to handle continuous k in each thread.
-      # recalculate localReadAddr to cancel wider local read in tail loop
+      # reCalculating localread address because we disable wider local read in tail loop
       if ((self.states.numReadsIterCoalescedA > 1 or self.states.numReadsIterCoalescedB > 1)):
         self.states.numReadsIterCoalescedA = 1
         self.states.numReadsIterCoalescedB = 1
@@ -4752,6 +4753,7 @@ class KernelWriterAssembly(KernelWriter):
         imod.add(self.lraDeclareAddresses(kernel, tPA))
         imod.add(self.lraFinalOffset(kernel, tPB))
         imod.add(self.lraDeclareAddresses(kernel, tPB))
+
         localRead2Perpendicular = False
         instructions = self.memoryInstructions
 

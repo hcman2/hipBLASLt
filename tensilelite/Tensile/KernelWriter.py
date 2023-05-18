@@ -192,7 +192,6 @@ class StateValues:
   startVgprAddressDbg: int               = -1
   startVgprAlphaTmp: int                 = -1
   startVgprSerial: int                   = -1
-  startVgprReuse: int                    = -1
 
   numSgprSizesSum: int                   = 0
   numSgprSizesFree: int                  = 0
@@ -1781,6 +1780,24 @@ class KernelWriter(metaclass=abc.ABCMeta):
     # Local Read Addresses
     ####################################
     lralwaMod = Module("local")
+
+    # C regs are not used during initialization so mark them as available -
+    # we will claim then just before the start of the unroll loop:
+    self.vgprPool.add(self.states.a.startVgprValu , \
+        self.states.lastValuAB - self.states.a.startVgprValu , "ValuAB") # Add as available
+    lralwaMod.addComment0("init: add vgpr [%u...%u) to pool" % \
+                         (self.states.a.startVgprValu, self.states.lastValuAB+self.states.a.startVgprValu))
+
+    self.vgprPool.add(self.states.c.startVgprValu, \
+      self.states.c.numVgprValu, "ValuC-Block") # Add as available
+    lralwaMod.addComment0("init: add vgpr [%u...%u) to pool" % \
+                         (self.states.c.startVgprValu, self.states.c.startVgprValu+self.states.c.numVgprValu))
+
+    numAccvgprs = self.states.totalAgprs
+    self.agprPool.add(0, numAccvgprs, "ValuC-Block")
+    lralwaMod.addComment0("init: add agpr [%u...%u) to pool" % \
+                         (0, numAccvgprs))
+
     lralwaMod.addComment2("Local Read Addresses")
 
     # tile assignments
@@ -1966,6 +1983,12 @@ class KernelWriter(metaclass=abc.ABCMeta):
       self.states.inTailLoop = True
       module.addComment2("Tail Loop")
 
+      # add vgprBuffer for local read to vgprPool because we won't issue local read in this section
+      self.vgprPool.add(self.states.a.startVgprValu , \
+        self.states.lastValuAB - self.states.a.startVgprValu, "ValuAB") # Add as available
+      module.addComment1("Tail: add ValuA/B vgpr buffer [%u...%u) to pool" % \
+                        (self.states.a.startVgprValu, self.states.a.startVgprValu+self.states.lastValuAB))
+
       # Update local write pointers in case the upcoming global reads are writing directly to LDS:
       if kernel["PrefetchGlobalRead"]:
         module.addComment1("local write reset offsets a")
@@ -2048,6 +2071,18 @@ class KernelWriter(metaclass=abc.ABCMeta):
             kernel["DepthU"] // kernel["MatrixInstK"] > 2:
         mEnd = kernel["DepthU"] // (kernel["MatrixInstK"] * 2)
 
+      # remove vgprBuffer for local read from vgprPool because we are ready to issue local read
+      self.vgprPool.remove(self.states.a.startVgprValu , \
+        self.states.lastValuAB - self.states.a.startVgprValu , "ValuAB") # remove from pool
+      module.addComment1("Tail: remove ValuA/B vgpr buffer [%u...%u) from pool" % \
+                        (self.states.a.startVgprValu , self.states.lastValuAB))
+
+      # add address vgpr to vgprPool
+      self.vgprPool.add(self.states.lastValuAB , \
+        self.states.lastVgprForReads - self.states.lastValuAB, "address vgpr") # Add as available
+      module.addComment1("Tail: add address/G2L vgpr [%u...%u) to pool" % \
+                        (self.states.lastValuAB, self.states.lastVgprForReads))
+
       for mValue in range(mEnd):
         pack[0] = Module()
         for iui in range(0, tailLoopInnerUnroll):
@@ -2068,19 +2103,10 @@ class KernelWriter(metaclass=abc.ABCMeta):
           module.add(self.localReadInc(kernel, iuiParam, tensorParametersB))
         module.add(self._wait(kernel, tensorParametersA, tensorParametersB, -1, -1, 0, "4wait for local read"))
 
-        if kernel["EnableMatrixInstruction"]:
-          module.add(pack[0])
-          # vgpr.checkin for all the checked-out vgpr in LocalRead
-          for item in list(pack[0].items()):
-            if item.tempVgpr != None:
-              self.vgprPool.checkIn(item.tempVgpr)
-              item.tempVgpr = None
-          pack[0] = Module()
+        module.add(pack[0])
+        pack[0] = Module()
 
-        if kernel["EnableMatrixInstruction"]:
-          module.add(self.mfmaIter(kernel, tensorParametersA, tensorParametersB, 0, tailLoopInnerUnroll, True))
-        else:
-          printExit("TensileLite does not support MAC instructions.")
+        module.add(self.mfmaIter(kernel, tensorParametersA, tensorParametersB, 0, tailLoopInnerUnroll, True))
         if kernel["ProblemType"]["Gradient"] and kernel["ProblemType"]["UseBias"] and (kernel["ProblemType"]["BiasSrc"] == "A" or kernel["ProblemType"]["BiasSrc"] == "B"):
           tP = tensorParametersA if kernel["ProblemType"]["BiasSrc"] == "A" else tensorParametersB
           module.add(self.exclasses.biasSumUnroll.loopSum(self, kernel, tP, 0, tailLoopInnerUnroll))
@@ -2091,6 +2117,12 @@ class KernelWriter(metaclass=abc.ABCMeta):
       module.add(self.closeLoop(kernel, tensorParametersA, tensorParametersB, -1, None, emitEndLabelOnly=True))
       # tail: close
       self.states.inTailLoop = False
+
+      # remove address vgpr to vgprPool
+      self.vgprPool.remove(self.states.lastValuAB , \
+        self.states.lastVgprForReads - self.states.lastValuAB, "address vgpr") # Add as available
+      module.addComment1("Tail: remove address/G2L [%u...%u) to pool" % \
+                        (self.states.lastValuAB, self.states.lastVgprForReads))
 
     # extra summation loops: global increment and close
     for i in reversed(range(self.states.otherSummationLoops)):
@@ -2722,13 +2754,12 @@ class KernelWriter(metaclass=abc.ABCMeta):
 
     if kernel["EnableMatrixInstruction"]:
       # MI kernels can overlap C-tile w/ AB-tile up until writeback. Illustrated below:
-      # |<-------------- valuC -------------->|
-      # |------------|-----------|xx|---------|
-      #   lastValuAB ^           ^  ^         ^
-      #         lastVgprForReads ^  ^         ^
-      #              startVgprReuse ^         ^
-      #                             lastValuC ^
-      # TODO a bit tricky. Better to manage all GPRs solely through RegisterPool
+      # |<-------------- valuC -------------->|<-->|
+      # |------------|-----------|------------|----|
+      #   lastValuAB ^           ^            ^    ^  (ValuA, ValuB)
+      #         lastVgprForReads ^            ^    ^  (localWriteAddr, globalReadOffser, G2L, localReadAddr)
+      #                             lastValuC ^    ^  (ValuC)
+      #                               vgprForStore ^  (other vgpr used in store section)
       self.states.serializedStore = True
 
       ########################################
@@ -2752,6 +2783,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
         vgprIdx += ceil(kernel["VectorWidthA"] * tensorParametersA["bpe"] / self.states.bpr) * kernel["MIWaveTileA"] // kernel["VectorWidthA"] * kernel["InnerUnroll"] * self.states.numVgprBuffer * kernel["MIInputPerThread"]
       else:
         vgprIdx += self.states.a.numVgprValuPerBlock * kernel["InnerUnroll"] * self.states.numVgprBufferPackA * (int(4/tensorParametersA["bpe"]) - 1)
+
     self.states.a.startVgprG2L = None
     if not kernel["DirectToLdsA"] or self.do["KeepDirectToLdsAlloc"]:
       # if PGR = True, PAP could be possibly enabled, we move G2LA later to prevent it from being reclaimed
@@ -2771,6 +2803,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
         vgprIdx += ceil(kernel["VectorWidthB"] * tensorParametersB["bpe"] / self.states.bpr) * kernel["MIWaveTileB"] // kernel["VectorWidthB"] * kernel["InnerUnroll"] * self.states.numVgprBuffer * kernel["MIInputPerThread"]
       else:
         vgprIdx += self.states.b.numVgprValuPerBlock * kernel["InnerUnroll"] * self.states.numVgprBufferPackB * (int(4/tensorParametersB["bpe"]) - 1)
+
     self.states.b.startVgprG2L = None
     if not kernel["DirectToLdsB"] or self.do["KeepDirectToLdsAlloc"]:
       # if PGR = True, PAP could be possibly enabled, we move G2LB later to prevent it from being reclaimed
@@ -2871,14 +2904,6 @@ class KernelWriter(metaclass=abc.ABCMeta):
     # code doesn't have to deal with fragmentation
     self.states.startVgprSerial = vgprIdx
     vgprIdx += 1 # for vgpr serial id
-
-    # tmp vgprs
-    #minVgprTmp += 4
-    #if globalParameters["DebugKernel"]:
-    #  minVgprTmp += 2
-    #vgprIdx += minVgprTmp
-    #print2("%3u vgprs <- %s" % (vgprIdx, self.states.kernelName) )
-    self.states.startVgprReuse = vgprIdx # for register reuse;
 
     self.states.totalVgprs = max(vgprIdx, self.states.c.numVgprValu)
     if self.states.totalVgprs < kernel["MinVgprNumber"] or self.states.totalVgprs > kernel["MaxVgprNumber"]:
@@ -3074,24 +3099,11 @@ class KernelWriter(metaclass=abc.ABCMeta):
     #print "TotalVgprs", self.states.totalVgprs
     self.vgprPool = RegisterPool(self.states.totalVgprs, 'v', defaultPreventOverflow=False,
                                  printRP=self.db["PrintRP"])
-    #print self.vgprPool.state()
     self.savedVgprPool = None
     self.savedSgprPool = None
 
-    # C regs are not used during initialization so mark them as available -
-    # we will claim then just before the start of the unroll loop:
-    self.vgprPool.add(self.states.a.startVgprValu , \
-        self.states.lastValuAB - self.states.a.startVgprValu , "ValuAB") # Add as available
-
-    self.vgprPool.add(self.states.c.startVgprValu, \
-      self.states.c.numVgprValu, "ValuC-Block") # Add as available
-    #print self.vgprPool.state()
     ## accumulator Buffer for storeCinUnroll feature
     self.agprPool = RegisterPool(self.states.totalAgprs, 'a', defaultPreventOverflow=False, printRP=0)
-    # C regs are not used during initialization so mark them as available -
-    # we will claim then just before the start of the unroll loop:
-    numAccvgprs = self.states.totalAgprs
-    self.agprPool.add(0, numAccvgprs, "ValuC-Block")
 
     ########################################
     # reads Per Iteration
