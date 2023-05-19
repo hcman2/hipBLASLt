@@ -193,14 +193,13 @@ class LocalReadMFMA(LocalRead):
                             % (tP["localReadOffset"], tP["localReadSwapByteOffset"], MIWaveGroupShape[tile01], vIdx, eIdx, rIdx, oIdx, bufferIdx, iui)
 
                     highBits = highBitsForHalf or isHigh16Bits
-                    readToTempVgpr = (highBitsForHalf or isHigh8Bits or isHigh16Bits) and not kernel["ClusterLocalReadPack"]
 
                     if numOffsets == 1:
                         ds = DSModifiers(na=1, offset=paramList[0])
                     else:
                         ds = DSModifiers(na=2, offset0=paramList[0], offset1=paramList[1])
                     LocalReadX = instruction.getInst(highBits)
-                    localReadCode.add(LocalReadX(dst=destVgpr, src=vgpr("LocalReadAddr%s"%tc), readToTempVgpr=readToTempVgpr, ds=ds, comment=comment))
+                    localReadCode.add(LocalReadX(dst=destVgpr, src=vgpr("LocalReadAddr%s"%tc), ds=ds, comment=comment))
 
                     # TODO - handle vector-load
                     with writer.allocTmpSgpr(1) as tmpSgprInfo:

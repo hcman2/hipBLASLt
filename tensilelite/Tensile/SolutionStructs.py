@@ -2756,12 +2756,6 @@ class Solution(collections.abc.Mapping):
     if state["ClusterLocalRead"] and state["PrefetchLocalRead"] >= state["LoopIters"] and not state["ScheduleIterAlg"] == 2:
       reject(state, "\"PLR >= LoopIters\" expression has been deprecated, please use ClusterLocalRead with PLR < LoopIters")
 
-    if state["ClusterLocalReadPack"]:
-      if not state["EnableMatrixInstruction"] or not state["ProblemType"]["DataType"].numRegisters() < 1:
-        reject(state, "CLRP only support Matrixinstruction")
-      if not state["ClusterLocalRead"]:
-        reject(state, "no meaning if set CLRP without CLR")
-
     # reject iterations are not enough to use wider local read
     if state["EnableMatrixInstruction"] and state["PrefetchLocalRead"] > 0:
       # Multiple = WLR-size / input-size = how many iters could be covered by one WLR ?

@@ -5818,11 +5818,11 @@ class KernelWriterAssembly(KernelWriter):
       ds  = DSModifiers(offset=offset)
       dst = vgpr(storeRegs[rIdx], rpv)
       if bps==4:
-        module.add(DSLoadB32(dst=dst, src=src, ds=ds, readToTempVgpr=False, comment="storeRemap lr"))
+        module.add(DSLoadB32(dst=dst, src=src, ds=ds, comment="storeRemap lr"))
       elif bps==8:
-        module.add(DSLoadB64(dst=dst, src=src, ds=ds, readToTempVgpr=False, comment="storeRemap lr"))
+        module.add(DSLoadB64(dst=dst, src=src, ds=ds, comment="storeRemap lr"))
       elif bps==16:
-        module.add(DSLoadB128(dst=dst, src=src, ds=ds, readToTempVgpr=False, comment="storeRemap lr"))
+        module.add(DSLoadB128(dst=dst, src=src, ds=ds, comment="storeRemap lr"))
       else:
         assert 0, "StoreRemap: bad bps!"
 
@@ -7033,13 +7033,13 @@ class KernelWriterAssembly(KernelWriter):
       ds = DSModifiers(offset=addrCalc.biasOffset)
       bps = dataType.numBytes() * ss.cfg.gwvw
       if bps==2:
-        module.add(DSLoadU16(dst=dst, src=src, readToTempVgpr=False, ds=ds, comment="load bias"))
+        module.add(DSLoadU16(dst=dst, src=src, ds=ds, comment="load bias"))
       elif bps==4:
-        module.add(DSLoadB32(dst=dst, src=src, readToTempVgpr=False, ds=ds, comment="load bias"))
+        module.add(DSLoadB32(dst=dst, src=src, ds=ds, comment="load bias"))
       elif bps==8:
-        module.add(DSLoadB64(dst=vgpr(biasVgpr, 2), src=src, readToTempVgpr=False, ds=ds, comment="load bias"))
+        module.add(DSLoadB64(dst=vgpr(biasVgpr, 2), src=src, ds=ds, comment="load bias"))
       elif bps==16:
-        module.add(DSLoadB128(dst=vgpr(biasVgpr, 4), src=src, readToTempVgpr=False, ds=ds, comment="load bias"))
+        module.add(DSLoadB128(dst=vgpr(biasVgpr, 4), src=src, ds=ds, comment="load bias"))
       return module
 
     if self.states.useBias == DataDirection.READ:
@@ -7313,12 +7313,12 @@ class KernelWriterAssembly(KernelWriter):
       bps = kernel["ProblemType"]["ComputeDataType"].numBytes() * gwvw
       ds  = DSModifiers(offset=0)
       if bps==2:
-        module.add(DSLoadB16(dst=vgpr(outVgprN), src=srcAddr, readToTempVgpr=True, ds=ds, comment="load bias"))
+        module.add(DSLoadB16(dst=vgpr(outVgprN), src=srcAddr, ds=ds, comment="load bias"))
       elif bps==4:
-        module.add(DSLoadB32(dst=vgpr(outVgprN), src=srcAddr, readToTempVgpr=True, ds=ds, comment="load bias"))
+        module.add(DSLoadB32(dst=vgpr(outVgprN), src=srcAddr, ds=ds, comment="load bias"))
       elif bps==8:
         gwvwK = 2
-        module.add(DSLoadB64(dst=vgpr(outVgprN, 2), src=srcAddr, readToTempVgpr=True, ds=ds, comment="load bias"))
+        module.add(DSLoadB64(dst=vgpr(outVgprN, 2), src=srcAddr, ds=ds, comment="load bias"))
       else:
         assert 0
       outVgprN += gwvwK
@@ -7332,11 +7332,11 @@ class KernelWriterAssembly(KernelWriter):
           bps = kernel["ProblemType"]["ComputeDataType"].numBytes() * gwvwK
           ds  = DSModifiers(offset=dsOffset)
           if bps==2:
-            module.add(DSLoadB16(dst=vgpr(outVgprN), src=srcAddr, readToTempVgpr=True, ds=ds, comment="load bias"))
+            module.add(DSLoadB16(dst=vgpr(outVgprN), src=srcAddr, ds=ds, comment="load bias"))
           elif bps==4:
-            module.add(DSLoadB32(dst=vgpr(outVgprN), src=srcAddr, readToTempVgpr=True, ds=ds, comment="load bias"))
+            module.add(DSLoadB32(dst=vgpr(outVgprN), src=srcAddr, ds=ds, comment="load bias"))
           elif bps==8:
-            module.add(DSLoadB64(dst=vgpr(outVgprN, 2), src=srcAddr, readToTempVgpr=True, ds=ds, comment="load bias"))
+            module.add(DSLoadB64(dst=vgpr(outVgprN, 2), src=srcAddr, ds=ds, comment="load bias"))
           else:
             assert 0
           outVgprN += gwvwK

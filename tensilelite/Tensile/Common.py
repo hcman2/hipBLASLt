@@ -416,12 +416,6 @@ validParameters = {
     # If set ClusterLocalRead, each iteration dedicated vgprBuffer for localRead
     # So we can schedule these localReads to the front of the loop
     "ClusterLocalRead":           [0,1],
-    # For bytes per element less than 4 (FP16, BF16, INT8 ...),
-    # we have to read 1 element to dedicated vgprBuffer, other elements to other vgprBuffers, then pack them into 1 register.
-    # This increase usage of vgpr and might decrease occupancy.
-    # CLRP=0: each iteration share PLR+1 vgprBuffer.
-    # CLRP=1: each iteration has dedicated vgprBuffer for packing.
-    "ClusterLocalReadPack":       [0,1],
 
     # We use double LDS buffer when PrefetchGlobalRead.
     # While it reads data from LDS[0]/[1], it prefetch global data and writes to LDS[1]/[0]
@@ -961,7 +955,6 @@ defaultBenchmarkCommonParameters = [
     {"PrefetchGlobalRead":        [ 1 ] },
     {"PrefetchLocalRead":         [ 1 ] },
     {"ClusterLocalRead":          [ 0 ] },
-    {"ClusterLocalReadPack":      [ 0 ] },
     {"SuppressNoLoadLoop":        [ False ]},
     {"ExpandPointerSwap":         [ True ]},
 

@@ -758,29 +758,28 @@ class KernelWriter(metaclass=abc.ABCMeta):
       ####
       # scheduled local read to previous iterations
       ####
-      if self.states.numVgprBuffer == kernel["LoopIters"]:
+      if kernel["ClusterLocalRead"]:
         for vacancy in self.localReadsVacancy:
           # {"items","latencyLeft","atIter","atMfmaIndex","noReadsAtThisIter"}
           for localRead in list(localReadItemsThisLoop):
             if vacancy["latencyLeft"] > localRead.issueLatency() * 2:
-              if not localRead.readToTempVgpr:
-                vacancy["latencyLeft"] -= localRead.issueLatency() * 2
-                vacancy["items"].add(localRead)
-                localReadItemsThisLoop.remove(localRead)
-                if vacancy["atMfmaIndex"] > self.states.lwStartMfmaIndex - 1 and kernel["1LDSBuffer"]:
-                  self.states.overflowedResources = 5
-                # update waitCnt
-                if self.states.numItersPLR:
-                  for readsIter in range(vacancy["atIter"], iteration + self.states.numItersPLR):
-                    if (vacancy["atMfmaIndex"] % numMfmaPerIter == 0 or readsIter != vacancy["atIter"]) and \
-                        (vacancy["noReadsAtThisIter"] or readsIter <= vacancy["atIter"] + self.states.numItersPLR):
-                      if isinstance(self.localReadsWait[readsIter], SWaitCnt):
-                        self.localReadsWait[readsIter].lgkmcnt += 1
-                        # This line is added for backward compatibility
-                        self.localReadsWait[readsIter].vscnt = self.localReadsWait[readsIter].vmcnt \
-                          if self.localReadsWait[readsIter].lgkmcnt != -1 and \
-                            self.localReadsWait[readsIter].vmcnt != -1 and \
-                            self.states.archCaps["SeparateVscnt"] else -1
+              vacancy["latencyLeft"] -= localRead.issueLatency() * 2
+              vacancy["items"].add(localRead)
+              localReadItemsThisLoop.remove(localRead)
+              if vacancy["atMfmaIndex"] > self.states.lwStartMfmaIndex - 1 and kernel["1LDSBuffer"]:
+                self.states.overflowedResources = 5
+              # update waitCnt
+              if self.states.numItersPLR:
+                for readsIter in range(vacancy["atIter"], iteration + self.states.numItersPLR):
+                  if (vacancy["atMfmaIndex"] % numMfmaPerIter == 0 or readsIter != vacancy["atIter"]) and \
+                      (vacancy["noReadsAtThisIter"] or readsIter <= vacancy["atIter"] + self.states.numItersPLR):
+                    if isinstance(self.localReadsWait[readsIter], SWaitCnt):
+                      self.localReadsWait[readsIter].lgkmcnt += 1
+                      # This line is added for backward compatibility
+                      self.localReadsWait[readsIter].vscnt = self.localReadsWait[readsIter].vmcnt \
+                        if self.localReadsWait[readsIter].lgkmcnt != -1 and \
+                          self.localReadsWait[readsIter].vmcnt != -1 and \
+                          self.states.archCaps["SeparateVscnt"] else -1
             else:
               # make sure the localread sequence remain the same
               vacancy["latencyLeft"] = 0
@@ -2328,12 +2327,12 @@ class KernelWriter(metaclass=abc.ABCMeta):
     else:
       self.states.numItersPLR = kernel["PrefetchLocalRead"]%(kernel["LoopIters"])
 
-    if kernel["PrefetchLocalRead"] > kernel["LoopIters"] - 1  or kernel["ClusterLocalRead"]:
+    if kernel["ClusterLocalRead"]:
       self.states.numVgprBuffer = kernel["LoopIters"]
     else:
       self.states.numVgprBuffer = kernel["PrefetchLocalRead"] + 1
 
-    if kernel["ClusterLocalReadPack"]:
+    if kernel["ClusterLocalRead"]:
       self.states.numVgprBufferPackA = kernel["LoopIters"]
       self.states.numVgprBufferPackB = kernel["LoopIters"]
     else:
