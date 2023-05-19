@@ -221,10 +221,11 @@ class StateValues:
   miLatencyLeft: int                     = 0
   numMfmaForLR: int                      = 1
   grEndMfmaIndex: int                    = -1
+  sync1LdsMfmaIndex: int                 = -1
   lwStartMfmaIndex: int                  = -1
   lwEndMfmaIndex: int                    = -1
   numMfmaForNextLoopLR: int              = -1
-  barrierMfmaIndex: int                  = -1
+  syncPlrMfmaIndex: int                  = -1
   numGlobalReadInsPerMfma: int           = 0
   numLocalWriteModPerMfma: int           = 0
 
@@ -434,7 +435,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
   #   self.states.grEndMfmaIndex
   #   self.states.lwStartMfmaIndex
   #   self.states.lwEndMfmaIndex
-  #   self.states.barrierMfmaIndex
+  #   self.states.syncPlrMfmaIndex
   #   self.states.numMfmaForNextLoopLR
   # This routine is responsible for setting the schedule including determining
   # that all necessary dependency are met.  The driver code in kernelBody
@@ -661,8 +662,10 @@ class KernelWriter(metaclass=abc.ABCMeta):
       iterCode.add(SSetPrior(prior=2, comment="Raise priority while processing macs"))
       pass
     elif self.states.scheduleIterAlg == 3:
-      iterCode.addComment0(" grEndMfmaIndex:%u, lwStartMfmaIndex:%u, lwEndMfmaIndex:%u " %(self.states.grEndMfmaIndex,self.states.lwStartMfmaIndex,self.states.lwEndMfmaIndex))
-      iterCode.addComment0(" numMfmaForLR:%u, barrierMfmaIndex:%u " %(self.states.numMfmaForNextLoopLR,self.states.barrierMfmaIndex))
+      iterCode.addComment0(" grEndMfmaIndex:%u, lwStartMfmaIndex:%u, lwEndMfmaIndex:%u "\
+                          %(self.states.grEndMfmaIndex, self.states.lwStartMfmaIndex, self.states.lwEndMfmaIndex))
+      iterCode.addComment0(" numMfmaForLR:%u, syncPlrMfmaIndex:%u "\
+                           %(self.states.numMfmaForNextLoopLR, self.states.syncPlrMfmaIndex))
       #####
       # Prepare and Assign parameter
       ####
@@ -766,7 +769,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
               vacancy["latencyLeft"] -= localRead.issueLatency() * 2
               vacancy["items"].add(localRead)
               localReadItemsThisLoop.remove(localRead)
-              if vacancy["atMfmaIndex"] > self.states.lwStartMfmaIndex - 1 and kernel["1LDSBuffer"]:
+              if vacancy["atMfmaIndex"] > self.states.sync1LdsMfmaIndex and kernel["1LDSBuffer"]:
                 self.states.overflowedResources = 5
               # update waitCnt
               if self.states.numItersPLR:
@@ -830,8 +833,8 @@ class KernelWriter(metaclass=abc.ABCMeta):
         # if start to schedule localwrite, but still have localreads not scheduled yet,
         # reject to use 1LDSB, since it will write and read same lds buffer at same time.
         # TODO: force to schedule all remaining localreads before start to schedule localwrite.
-        if mfmaIndex >= self.states.lwStartMfmaIndex and mfmaIndex <= max(self.states.lwEndMfmaIndex,self.states.barrierMfmaIndex) and \
-          localReadItemsThisLoop and localWriteCode.countType(LocalWriteInstruction) and kernel["1LDSBuffer"]:
+        if mfmaIndex > self.states.sync1LdsMfmaIndex and localReadItemsThisLoop and kernel["1LDSBuffer"]:
+            # and mfmaIndex <= max(self.states.lwEndMfmaIndex,self.states.syncPlrMfmaIndex) and localWriteCode.countType(LocalWriteInstruction):
           self.states.overflowedResources = 5
         for j in range(readLeft):
           if localReadItemsThisLoop:
@@ -840,7 +843,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
             if (i == 0):
               localReadsWaitcnt += 1
         if not localReadItemsThisLoop and latencyLeft > 0 and iteration < isBarrier and \
-            not(mfmaIndex > self.states.lwStartMfmaIndex and kernel["1LDSBuffer"]):
+            not(mfmaIndex > self.states.sync1LdsMfmaIndex and kernel["1LDSBuffer"]):
           item = Module()
           item.addComment0("localReadsVacancy: latencyLeft %d"%(latencyLeft))
           iterCode.add(item)
@@ -873,7 +876,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
         ####
         # scheduled local write
         ####
-        if kernel["1LDSBuffer"] and mfmaIndex == self.states.lwStartMfmaIndex - 1:
+        if kernel["1LDSBuffer"] and mfmaIndex == self.states.sync1LdsMfmaIndex:
           barrier = Module()
           barrier.addComment0("1 LDS buffer: read-sync-write")
           barrier.add(SWaitCnt(lgkmcnt=0, comment=""))
@@ -886,16 +889,16 @@ class KernelWriter(metaclass=abc.ABCMeta):
             lwStartOffset = 0
             if kernel["DirectToLds"]:
               lwStartOffset = 2
-            #  if (mfmaIndex == self.states.lwStartMfmaIndex or mfmaIndex == self.states.barrierMfmaIndex+2):
-            if (mfmaIndex == self.states.lwStartMfmaIndex + lwStartOffset or mfmaIndex == self.states.barrierMfmaIndex+1) :
+            #  if (mfmaIndex == self.states.lwStartMfmaIndex or mfmaIndex == self.states.syncPlrMfmaIndex+2):
+            if (mfmaIndex == self.states.lwStartMfmaIndex + lwStartOffset or mfmaIndex == self.states.syncPlrMfmaIndex+1) :
               flagInsert = True
           elif kernel["PrefetchGlobalRead"] == 1 and numMfmaPerIter >= 4:
             # this setting is good for fixed clock, but not good for auto clock
-            #if (mfmaIndex == self.states.grEndMfmaIndex or mfmaIndex == self.states.barrierMfmaIndex+1) :
+            #if (mfmaIndex == self.states.grEndMfmaIndex or mfmaIndex == self.states.syncPlrMfmaIndex+1) :
             withGL = (not NLLlast)
             withDTLload = kernel["DirectToLds"] and withGL
             startIndex = 0 if withDTLload else 1
-            if (mfmaIndex == startIndex or withGL and mfmaIndex == self.states.barrierMfmaIndex+1):
+            if (mfmaIndex == startIndex or withGL and mfmaIndex == self.states.syncPlrMfmaIndex+1):
               flagInsert = True
           if flagInsert:
             iterCode.add(SSetPrior(prior=3, comment="store optimization"))
@@ -933,7 +936,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
         ####
         # scheduled sync
         ####
-        if mfmaIndex == self.states.barrierMfmaIndex and self.states.numItersPLR:
+        if mfmaIndex == self.states.syncPlrMfmaIndex and self.states.numItersPLR:
           iterCode.add(waitLWCode)
           iterCode.add(syncCode)
 
@@ -1025,12 +1028,12 @@ class KernelWriter(metaclass=abc.ABCMeta):
         if kernel["StorePriorityOpt"]:
           flagInsert = False
           if kernel["PrefetchGlobalRead"] == 2:
-            #  if (mfmaIndex == self.states.barrierMfmaIndex or mfmaIndex == (kernel["LoopIters"] * numMfmaPerIter - 1)):
-            if (mfmaIndex == self.states.barrierMfmaIndex - 1 or (not NLLlast) and mfmaIndex == (kernel["LoopIters"] * numMfmaPerIter - 1)) :
+            #  if (mfmaIndex == self.states.syncPlrMfmaIndex or mfmaIndex == (kernel["LoopIters"] * numMfmaPerIter - 1)):
+            if (mfmaIndex == self.states.syncPlrMfmaIndex - 1 or (not NLLlast) and mfmaIndex == (kernel["LoopIters"] * numMfmaPerIter - 1)) :
                 flagInsert = True
           elif kernel["PrefetchGlobalRead"] == 1 and numMfmaPerIter >= 4:
             # this setting is good for fixed clock, but not good for auto clock
-            #if (mfmaIndex == mfmaIndex == self.states.barrierMfmaIndex - 1 or mfmaIndex == (kernel["LoopIters"] * numMfmaPerIter - 1)) :
+            #if (mfmaIndex == mfmaIndex == self.states.syncPlrMfmaIndex - 1 or mfmaIndex == (kernel["LoopIters"] * numMfmaPerIter - 1)) :
             insertPos1 = self.states.grEndMfmaIndex
             if not kernel["NoLdsWriteCode"]:
               insertPos1 = self.states.lwStartMfmaIndex - 1

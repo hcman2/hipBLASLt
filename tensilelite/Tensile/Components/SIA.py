@@ -38,51 +38,39 @@ class SIA3(SIA):
 
     def schedIntoIteration(self, writer, kernel, tensorParametersA, tensorParametersB, localWriteEndIter, firstIter, lastLoop, lastLc, maxVmcnt, globalReadIncACode, globalReadIncBCode):
         # Get schedule information
-        if kernel["EnableMatrixInstruction"]:
-            numMfmaBetweenLWandBarrier, latencyLeft = getLocalWriteMFMAEnd(writer, kernel, tensorParametersA, tensorParametersB)
-            #########
-            # Internally assign an optimized LWPM value for PGR2
-            #########
-            # strategy is to distribute LW/GR as wide as possible to avoid hitting vmem FIFO
-            # LWPM = (LW_End - LW_Start) / numLW
-            if kernel["LocalWritePerMfma"] == -1:
-                lwStartMfmaIndex = getLocalWriteMFMAStart(writer, kernel, tensorParametersA, tensorParametersB, latencyLeft)
-                numLocalWriteModPerMfma = getNumLocalWritePerMfma(writer, kernel, lwStartMfmaIndex)
-            else:
-                numLocalWriteModPerMfma = roundUp(kernel["LocalWritePerMfma"]*PRECISION)
-
-            AssignGRPMandLWPM(writer, kernel, numLocalWriteModPerMfma)
-            localWriteEndIter = fixLocalWriteEndMfmaIndex(writer, kernel, tensorParametersA, tensorParametersB, \
-                globalReadIncACode, globalReadIncBCode, numMfmaBetweenLWandBarrier, lastLoop)
-            numGlobalReadInsPerIter, numLocalWriteModPerIter, numEmptyGlobalReadIncCode = getScheduleParamMfma(writer)
+        numMfmaBetweenLWandBarrier, latencyLeft = getLocalWriteMFMAEnd(writer, kernel, tensorParametersA, tensorParametersB)
+        #########
+        # Internally assign an optimized LWPM value for PGR2
+        #########
+        # strategy is to distribute LW/GR as wide as possible to avoid hitting vmem FIFO
+        # LWPM = (LW_End - LW_Start) / numLW
+        if kernel["LocalWritePerMfma"] == -1:
+            lwStartMfmaIndex = getLocalWriteMFMAStart(writer, kernel, tensorParametersA, tensorParametersB, latencyLeft)
+            numLocalWriteModPerMfma = getNumLocalWritePerMfma(writer, kernel, lwStartMfmaIndex)
         else:
-            numGlobalReadInsPerIter, numLocalWriteModPerIter, numEmptyGlobalReadIncCode = getScheduleParams(kernel)
+            numLocalWriteModPerMfma = roundUp(kernel["LocalWritePerMfma"]*PRECISION)
+
+        AssignGRPMandLWPM(writer, kernel, numLocalWriteModPerMfma)
+        localWriteEndIter = fixLocalWriteEndMfmaIndex(writer, kernel, tensorParametersA, tensorParametersB, \
+            globalReadIncACode, globalReadIncBCode, numMfmaBetweenLWandBarrier, lastLoop)
+        numGlobalReadInsPerIter, numLocalWriteModPerIter, numEmptyGlobalReadIncCode = getScheduleParamMfma(writer)
         numLocalWritesPerSched = writer.states.numLocalWriteModPerMfma
         # Schedule global read
         if not writer.states.scheduleGlobalRead:
             itemsGRToSchedLater, lastLoadIter = noSchedGlobalRead(writer, kernel, globalReadIncACode, globalReadIncBCode)
-            if kernel["EnableMatrixInstruction"]:
-                writer.states.grEndMfmaIndex = 0
+            writer.states.grEndMfmaIndex = 0
         else:
             itemsGRToSched, itemsGRToSchedLater = prepareGRInstToSched(writer, kernel)
-            if kernel["EnableMatrixInstruction"]:
-                itemsGRIncToSched = appendInstToSchedSIA3(writer, kernel, numEmptyGlobalReadIncCode, globalReadIncACode, globalReadIncBCode)
-                schedNumForIter0, endIter = getSchedNumForIter0SIA3(writer, kernel, itemsGRToSched, itemsGRIncToSched, numGlobalReadInsPerIter)
-            else:
-                itemsGRIncToSched = appendInstToSchedDefault(numEmptyGlobalReadIncCode, globalReadIncACode, globalReadIncBCode)
-                schedNumForIter0, endIter = getSchedNumForIter0Default(itemsGRToSched, itemsGRIncToSched, numGlobalReadInsPerIter, localWriteEndIter)
+            itemsGRIncToSched = appendInstToSchedSIA3(writer, kernel, numEmptyGlobalReadIncCode, globalReadIncACode, globalReadIncBCode)
+            schedNumForIter0, endIter = getSchedNumForIter0SIA3(writer, kernel, itemsGRToSched, itemsGRIncToSched, numGlobalReadInsPerIter)
             lastLoadIter = schedGlobalRead(writer, itemsGRToSched, itemsGRIncToSched, numGlobalReadInsPerIter, schedNumForIter0, endIter)
         # Schedule local write
         if not writer.states.scheduleLocalWrite:
             noSchedLocalWrite(writer, kernel, tensorParametersA, tensorParametersB, localWriteEndIter)
-            if kernel["EnableMatrixInstruction"]:
-                writer.states.lwStartMfmaIndex = writer.states.lwEndMfmaIndex
+            writer.states.lwStartMfmaIndex = writer.states.lwEndMfmaIndex
         else:
             itemsLWToSched, numWritesToSched = prepareLWInstToSched(writer, kernel, numLocalWritesPerSched)
-            if kernel["EnableMatrixInstruction"]:
-                startIter = assignLWSchedIndexSIA3(writer, kernel, numLocalWritesPerSched, localWriteEndIter, numWritesToSched)
-            else:
-                startIter = assignLWSchedIndexDefault(writer, kernel, numLocalWritesPerSched, localWriteEndIter, lastLoadIter, numWritesToSched)
+            startIter = assignLWSchedIndexSIA3(writer, kernel, numLocalWritesPerSched, localWriteEndIter, numWritesToSched)
             readsToWait, readsToWaitNGLL = getReadsToWait(writer, kernel)
             # make sure numLocalWriteModPerIter is enough to schedule localwrite
             startIterItem = numLocalWriteModPerIter - (writer.states.lwStartMfmaIndex % writer.states.numMfmaPerIter) * numLocalWritesPerSched
@@ -212,12 +200,12 @@ def getLocalWriteMFMAEnd(writer, kernel, tensorParametersA, tensorParametersB):
         writer.states.numMfmaForNextLoopLR += 1
     # final index definition
     writer.states.numMfmaForNextLoopLR = min(writer.states.numMfmaForNextLoopLR,numMfmaPerIter-1)
-    writer.states.barrierMfmaIndex = numMfmaPerIter*(kernel["LoopIters"]-writer.states.numItersPLR+1) - writer.states.numMfmaForNextLoopLR - 1 if writer.states.numItersPLR else 0
+    writer.states.syncPlrMfmaIndex = numMfmaPerIter*(kernel["LoopIters"]-writer.states.numItersPLR+1) - writer.states.numMfmaForNextLoopLR - 1 if writer.states.numItersPLR else 0
     numMfmaBetweenLWandBarrier = 2 if kernel["MatrixInstM"] == 32 else 3
-    writer.states.lwEndMfmaIndex = max(writer.states.barrierMfmaIndex - numMfmaBetweenLWandBarrier,0) if writer.states.numItersPLR else numMfmaPerIter*kernel["LoopIters"] - 1
+    writer.states.lwEndMfmaIndex = max(writer.states.syncPlrMfmaIndex - numMfmaBetweenLWandBarrier,0) if writer.states.numItersPLR else numMfmaPerIter*kernel["LoopIters"] - 1
     if kernel["DirectToLds"] and kernel["PrefetchGlobalRead"] == 2:
         # DirectToLds + PGR=2 case, lwEndMfmaIndex must be after the end of local read (excluding local reads for next iter)
-        lrEnd = min(writer.states.barrierMfmaIndex - 1, writer.states.numMfmaForLR * (kernel["LoopIters"] - writer.states.numItersPLR))
+        lrEnd = min(writer.states.syncPlrMfmaIndex - 1, writer.states.numMfmaForLR * (kernel["LoopIters"] - writer.states.numItersPLR))
         if writer.states.lwEndMfmaIndex < lrEnd:
             writer.states.lwEndMfmaIndex = lrEnd
     return numMfmaBetweenLWandBarrier, latencyLeft
@@ -281,14 +269,14 @@ def getLocalWriteMFMAStart(writer, kernel, tensorParametersA, tensorParametersB,
             latencyForLR -= writer.states.miLatency
             lwStartMfmaIndex += 1
 
+    if lwStartMfmaIndex > writer.states.lwEndMfmaIndex:
+        lwStartMfmaIndex = writer.states.lwEndMfmaIndex
     return lwStartMfmaIndex
 
 def getNumLocalWritePerMfma(writer, kernel, lwStartMfmaIndex):
     #########
     # Get LocalWritePerMfma
     #########
-    if lwStartMfmaIndex > writer.states.lwEndMfmaIndex:
-        lwStartMfmaIndex = writer.states.lwEndMfmaIndex
     numMfmaCanSched = writer.states.lwEndMfmaIndex - lwStartMfmaIndex + 1
     numLoadsA = kernel["DepthU"]*kernel["MacroTileA"]//kernel["GlobalReadVectorWidthA"]//kernel["NumThreads"]
     numLoadsB = kernel["DepthU"]*kernel["MacroTileB"]//kernel["GlobalReadVectorWidthB"]//kernel["NumThreads"]
@@ -365,7 +353,7 @@ def fixLocalWriteEndMfmaIndex(writer, kernel, tPA, tPB, globalReadIncACode, glob
     if kernel["PrefetchGlobalRead"] == 2 and writer.states.numLocalWriteModPerMfma % PRECISION != 0:
         numMfmaBetweenLWandBarrier -= 1
 
-    writer.states.lwEndMfmaIndex = max(writer.states.barrierMfmaIndex - numMfmaBetweenLWandBarrier,0) if writer.states.numItersPLR else numMfmaPerIter*kernel["LoopIters"] - 1
+    writer.states.lwEndMfmaIndex = max(writer.states.syncPlrMfmaIndex - numMfmaBetweenLWandBarrier,0) if writer.states.numItersPLR else numMfmaPerIter*kernel["LoopIters"] - 1
     # adjust lwEndMfmaIndex for the following cases
     #  1) PGR=2
     #  2) last loop enabled case
@@ -376,7 +364,7 @@ def fixLocalWriteEndMfmaIndex(writer, kernel, tPA, tPB, globalReadIncACode, glob
         writer.states.lwEndMfmaIndex = min(writer.states.lwEndMfmaIndex, numMfmaPerIter * (kernel["LoopIters"] - 1) - 1)
     if kernel["DirectToLds"] and kernel["PrefetchGlobalRead"] == 2:
         # DirectToLds + PGR=2 case, lwEndMfmaIndex must be after the end of local read (excluding local reads for next iter)
-        lrEnd = min(writer.states.barrierMfmaIndex - 1, writer.states.numMfmaForLR * (kernel["LoopIters"] - writer.states.numItersPLR))
+        lrEnd = min(writer.states.syncPlrMfmaIndex - 1, writer.states.numMfmaForLR * (kernel["LoopIters"] - writer.states.numItersPLR))
         if writer.states.lwEndMfmaIndex < lrEnd:
             writer.states.lwEndMfmaIndex = lrEnd
     localWriteEndIter = writer.states.lwEndMfmaIndex//numMfmaPerIter
@@ -633,6 +621,8 @@ def assignLWSchedIndexSIA3(writer, kernel, numLocalWritesPerSched, localWriteEnd
         lrEnd = min(writer.states.lwEndMfmaIndex, writer.states.numMfmaForLR * (kernel["LoopIters"] - writer.states.numItersPLR))
         if writer.states.lwStartMfmaIndex < lrEnd:
             writer.states.lwStartMfmaIndex = lrEnd
+    if kernel["1LDSBuffer"]:
+        writer.states.sync1LdsMfmaIndex = max(writer.states.lwStartMfmaIndex - 1, 0)
     startIter = writer.states.lwStartMfmaIndex//numMfmaPerIter
     assert startIter < localWriteEndIter+1 # startIter should be at or before the endIter
     return startIter
