@@ -105,7 +105,7 @@
     LVPA: 2
     LVPB: 8
     LdsBlockSizePerPad: 128
-    LdsBlockSizePerPadA: 0
+    LdsBlockSizePerPadA: 1024
     LdsBlockSizePerPadB: 128
     LdsInitCVgprs: false
     LdsNumElements: 12832
@@ -115,7 +115,7 @@
     LdsOffsetA_Blk: 8192
     LdsOffsetB: 4096
     LdsOffsetB_Blk: 12288
-    LdsPadA: 0
+    LdsPadA: 16
     LdsPadB: 4
     LocalReadVectorWidth: 4
     LocalSplitU: 1
@@ -323,7 +323,7 @@
     LVPA: 4
     LVPB: 8
     LdsBlockSizePerPad: 128
-    LdsBlockSizePerPadA: 0
+    LdsBlockSizePerPadA: 1536
     LdsBlockSizePerPadB: 128
     LdsInitCVgprs: false
     LdsNumElements: 14880
@@ -333,7 +333,7 @@
     LdsOffsetA_Blk: 8192
     LdsOffsetB: 6144
     LdsOffsetB_Blk: 14336
-    LdsPadA: 0
+    LdsPadA: 16
     LdsPadB: 4
     LocalReadVectorWidth: 4
     LocalSplitU: 1
@@ -541,7 +541,7 @@
     LVPA: 8
     LVPB: 8
     LdsBlockSizePerPad: 128
-    LdsBlockSizePerPadA: 0
+    LdsBlockSizePerPadA: 256
     LdsBlockSizePerPadB: 128
     LdsInitCVgprs: false
     LdsNumElements: 6208
@@ -551,7 +551,7 @@
     LdsOffsetA_Blk: 4096
     LdsOffsetB: 1024
     LdsOffsetB_Blk: 5120
-    LdsPadA: 0
+    LdsPadA: 16
     LdsPadB: 4
     LocalReadVectorWidth: 4
     LocalSplitU: 1
@@ -759,7 +759,7 @@
     LVPA: 4
     LVPB: 8
     LdsBlockSizePerPad: 128
-    LdsBlockSizePerPadA: 0
+    LdsBlockSizePerPadA: 512
     LdsBlockSizePerPadB: 128
     LdsInitCVgprs: false
     LdsNumElements: 7232
@@ -769,7 +769,7 @@
     LdsOffsetA_Blk: 4096
     LdsOffsetB: 2048
     LdsOffsetB_Blk: 6144
-    LdsPadA: 0
+    LdsPadA: 16
     LdsPadB: 4
     LocalReadVectorWidth: 4
     LocalSplitU: 1
@@ -977,7 +977,7 @@
     LVPA: 8
     LVPB: 8
     LdsBlockSizePerPad: 128
-    LdsBlockSizePerPadA: 0
+    LdsBlockSizePerPadA: 768
     LdsBlockSizePerPadB: 128
     LdsInitCVgprs: false
     LdsNumElements: 12352
@@ -987,7 +987,7 @@
     LdsOffsetA_Blk: 8192
     LdsOffsetB: 3072
     LdsOffsetB_Blk: 11264
-    LdsPadA: 0
+    LdsPadA: 16
     LdsPadB: 4
     LocalReadVectorWidth: 4
     LocalSplitU: 1
@@ -1413,7 +1413,7 @@
     LVPA: 8
     LVPB: 8
     LdsBlockSizePerPad: 128
-    LdsBlockSizePerPadA: 0
+    LdsBlockSizePerPadA: 1280
     LdsBlockSizePerPadB: 128
     LdsInitCVgprs: false
     LdsNumElements: 14400
@@ -1423,7 +1423,7 @@
     LdsOffsetA_Blk: 8192
     LdsOffsetB: 5120
     LdsOffsetB_Blk: 13312
-    LdsPadA: 0
+    LdsPadA: 16
     LdsPadB: 4
     LocalReadVectorWidth: 4
     LocalSplitU: 1
@@ -1631,7 +1631,7 @@
     LVPA: 4
     LVPB: 8
     LdsBlockSizePerPad: 128
-    LdsBlockSizePerPadA: 0
+    LdsBlockSizePerPadA: 1536
     LdsBlockSizePerPadB: 128
     LdsInitCVgprs: false
     LdsNumElements: 15424
@@ -1641,7 +1641,7 @@
     LdsOffsetA_Blk: 8192
     LdsOffsetB: 6144
     LdsOffsetB_Blk: 14336
-    LdsPadA: 0
+    LdsPadA: 16
     LdsPadB: 4
     LocalReadVectorWidth: 4
     LocalSplitU: 1
@@ -1849,7 +1849,7 @@
     LVPA: 4
     LVPB: 8
     LdsBlockSizePerPad: 128
-    LdsBlockSizePerPadA: 0
+    LdsBlockSizePerPadA: 512
     LdsBlockSizePerPadB: 128
     LdsInitCVgprs: false
     LdsNumElements: 7776
@@ -1859,7 +1859,7 @@
     LdsOffsetA_Blk: 4096
     LdsOffsetB: 2048
     LdsOffsetB_Blk: 6144
-    LdsPadA: 0
+    LdsPadA: 16
     LdsPadB: 4
     LocalReadVectorWidth: 4
     LocalSplitU: 1
@@ -2067,7 +2067,7 @@
     LVPA: 2
     LVPB: 8
     LdsBlockSizePerPad: 128
-    LdsBlockSizePerPadA: 0
+    LdsBlockSizePerPadA: 1024
     LdsBlockSizePerPadB: 128
     LdsInitCVgprs: false
     LdsNumElements: 13920
@@ -2077,7 +2077,7 @@
     LdsOffsetA_Blk: 8192
     LdsOffsetB: 4096
     LdsOffsetB_Blk: 12288
-    LdsPadA: 0
+    LdsPadA: 16
     LdsPadB: 4
     LocalReadVectorWidth: 4
     LocalSplitU: 1
@@ -2285,7 +2285,7 @@
     LVPA: 4
     LVPB: 8
     LdsBlockSizePerPad: 128
-    LdsBlockSizePerPadA: 0
+    LdsBlockSizePerPadA: 1536
     LdsBlockSizePerPadB: 128
     LdsInitCVgprs: false
     LdsNumElements: 15968
@@ -2295,7 +2295,7 @@
     LdsOffsetA_Blk: 8192
     LdsOffsetB: 6144
     LdsOffsetB_Blk: 14336
-    LdsPadA: 0
+    LdsPadA: 16
     LdsPadB: 4
     LocalReadVectorWidth: 4
     LocalSplitU: 1
@@ -2503,7 +2503,7 @@
     LVPA: 16
     LVPB: 8
     LdsBlockSizePerPad: 128
-    LdsBlockSizePerPadA: 0
+    LdsBlockSizePerPadA: 128
     LdsBlockSizePerPadB: 128
     LdsInitCVgprs: false
     LdsNumElements: 6784
@@ -2513,7 +2513,7 @@
     LdsOffsetA_Blk: 4096
     LdsOffsetB: 512
     LdsOffsetB_Blk: 4608
-    LdsPadA: 0
+    LdsPadA: 16
     LdsPadB: 4
     LocalReadVectorWidth: 4
     LocalSplitU: 1
@@ -2721,7 +2721,7 @@
     LVPA: 8
     LVPB: 8
     LdsBlockSizePerPad: 128
-    LdsBlockSizePerPadA: 0
+    LdsBlockSizePerPadA: 256
     LdsBlockSizePerPadB: 128
     LdsInitCVgprs: false
     LdsNumElements: 7296
@@ -2731,7 +2731,7 @@
     LdsOffsetA_Blk: 4096
     LdsOffsetB: 1024
     LdsOffsetB_Blk: 5120
-    LdsPadA: 0
+    LdsPadA: 16
     LdsPadB: 4
     LocalReadVectorWidth: 4
     LocalSplitU: 1
@@ -2939,7 +2939,7 @@
     LVPA: 16
     LVPB: 8
     LdsBlockSizePerPad: 128
-    LdsBlockSizePerPadA: 0
+    LdsBlockSizePerPadA: 384
     LdsBlockSizePerPadB: 128
     LdsInitCVgprs: false
     LdsNumElements: 7808
@@ -2949,7 +2949,7 @@
     LdsOffsetA_Blk: 4096
     LdsOffsetB: 1536
     LdsOffsetB_Blk: 5632
-    LdsPadA: 0
+    LdsPadA: 16
     LdsPadB: 4
     LocalReadVectorWidth: 4
     LocalSplitU: 1
@@ -3375,7 +3375,7 @@
     LVPA: 16
     LVPB: 8
     LdsBlockSizePerPad: 128
-    LdsBlockSizePerPadA: 0
+    LdsBlockSizePerPadA: 640
     LdsBlockSizePerPadB: 128
     LdsInitCVgprs: false
     LdsNumElements: 12928
@@ -3385,7 +3385,7 @@
     LdsOffsetA_Blk: 8192
     LdsOffsetB: 2560
     LdsOffsetB_Blk: 10752
-    LdsPadA: 0
+    LdsPadA: 16
     LdsPadB: 4
     LocalReadVectorWidth: 4
     LocalSplitU: 1
@@ -3593,7 +3593,7 @@
     LVPA: 8
     LVPB: 8
     LdsBlockSizePerPad: 128
-    LdsBlockSizePerPadA: 0
+    LdsBlockSizePerPadA: 768
     LdsBlockSizePerPadB: 128
     LdsInitCVgprs: false
     LdsNumElements: 13440
@@ -3603,7 +3603,7 @@
     LdsOffsetA_Blk: 8192
     LdsOffsetB: 3072
     LdsOffsetB_Blk: 11264
-    LdsPadA: 0
+    LdsPadA: 16
     LdsPadB: 4
     LocalReadVectorWidth: 4
     LocalSplitU: 1
@@ -3811,7 +3811,7 @@
     LVPA: 16
     LVPB: 8
     LdsBlockSizePerPad: 128
-    LdsBlockSizePerPadA: 0
+    LdsBlockSizePerPadA: 896
     LdsBlockSizePerPadB: 128
     LdsInitCVgprs: false
     LdsNumElements: 13952
@@ -3821,7 +3821,7 @@
     LdsOffsetA_Blk: 8192
     LdsOffsetB: 3584
     LdsOffsetB_Blk: 11776
-    LdsPadA: 0
+    LdsPadA: 16
     LdsPadB: 4
     LocalReadVectorWidth: 4
     LocalSplitU: 1
@@ -4247,7 +4247,7 @@
     LVPA: 16
     LVPB: 8
     LdsBlockSizePerPad: 128
-    LdsBlockSizePerPadA: 0
+    LdsBlockSizePerPadA: 1152
     LdsBlockSizePerPadB: 128
     LdsInitCVgprs: false
     LdsNumElements: 14976
@@ -4257,7 +4257,7 @@
     LdsOffsetA_Blk: 8192
     LdsOffsetB: 4608
     LdsOffsetB_Blk: 12800
-    LdsPadA: 0
+    LdsPadA: 16
     LdsPadB: 4
     LocalReadVectorWidth: 4
     LocalSplitU: 1
@@ -4465,7 +4465,7 @@
     LVPA: 8
     LVPB: 8
     LdsBlockSizePerPad: 128
-    LdsBlockSizePerPadA: 0
+    LdsBlockSizePerPadA: 1280
     LdsBlockSizePerPadB: 128
     LdsInitCVgprs: false
     LdsNumElements: 15488
@@ -4475,7 +4475,7 @@
     LdsOffsetA_Blk: 8192
     LdsOffsetB: 5120
     LdsOffsetB_Blk: 13312
-    LdsPadA: 0
+    LdsPadA: 16
     LdsPadB: 4
     LocalReadVectorWidth: 4
     LocalSplitU: 1
@@ -4683,7 +4683,7 @@
     LVPA: 16
     LVPB: 8
     LdsBlockSizePerPad: 128
-    LdsBlockSizePerPadA: 0
+    LdsBlockSizePerPadA: 1408
     LdsBlockSizePerPadB: 128
     LdsInitCVgprs: false
     LdsNumElements: 16000
@@ -4693,7 +4693,7 @@
     LdsOffsetA_Blk: 8192
     LdsOffsetB: 5632
     LdsOffsetB_Blk: 13824
-    LdsPadA: 0
+    LdsPadA: 16
     LdsPadB: 4
     LocalReadVectorWidth: 4
     LocalSplitU: 1
@@ -5337,7 +5337,7 @@
     LVPA: 4
     LVPB: 8
     LdsBlockSizePerPad: 128
-    LdsBlockSizePerPadA: 0
+    LdsBlockSizePerPadA: 512
     LdsBlockSizePerPadB: 128
     LdsInitCVgprs: false
     LdsNumElements: 12960
@@ -5347,7 +5347,7 @@
     LdsOffsetA_Blk: 8192
     LdsOffsetB: 2048
     LdsOffsetB_Blk: 10240
-    LdsPadA: 0
+    LdsPadA: 16
     LdsPadB: 4
     LocalReadVectorWidth: 4
     LocalSplitU: 1
@@ -5555,7 +5555,7 @@
     LVPA: 2
     LVPB: 8
     LdsBlockSizePerPad: 128
-    LdsBlockSizePerPadA: 0
+    LdsBlockSizePerPadA: 1024
     LdsBlockSizePerPadB: 128
     LdsInitCVgprs: false
     LdsNumElements: 15008
@@ -5565,7 +5565,7 @@
     LdsOffsetA_Blk: 8192
     LdsOffsetB: 4096
     LdsOffsetB_Blk: 12288
-    LdsPadA: 0
+    LdsPadA: 16
     LdsPadB: 4
     LocalReadVectorWidth: 4
     LocalSplitU: 1
@@ -5773,7 +5773,7 @@
     LVPA: 8
     LVPB: 8
     LdsBlockSizePerPad: 128
-    LdsBlockSizePerPadA: 0
+    LdsBlockSizePerPadA: 256
     LdsBlockSizePerPadB: 128
     LdsInitCVgprs: false
     LdsNumElements: 12480
@@ -5783,7 +5783,7 @@
     LdsOffsetA_Blk: 8192
     LdsOffsetB: 1024
     LdsOffsetB_Blk: 9216
-    LdsPadA: 0
+    LdsPadA: 16
     LdsPadB: 4
     LocalReadVectorWidth: 4
     LocalSplitU: 1
@@ -5991,7 +5991,7 @@
     LVPA: 4
     LVPB: 8
     LdsBlockSizePerPad: 128
-    LdsBlockSizePerPadA: 0
+    LdsBlockSizePerPadA: 512
     LdsBlockSizePerPadB: 128
     LdsInitCVgprs: false
     LdsNumElements: 13504
@@ -6001,7 +6001,7 @@
     LdsOffsetA_Blk: 8192
     LdsOffsetB: 2048
     LdsOffsetB_Blk: 10240
-    LdsPadA: 0
+    LdsPadA: 16
     LdsPadB: 4
     LocalReadVectorWidth: 4
     LocalSplitU: 1
@@ -6209,7 +6209,7 @@
     LVPA: 8
     LVPB: 8
     LdsBlockSizePerPad: 128
-    LdsBlockSizePerPadA: 0
+    LdsBlockSizePerPadA: 768
     LdsBlockSizePerPadB: 128
     LdsInitCVgprs: false
     LdsNumElements: 14528
@@ -6219,7 +6219,7 @@
     LdsOffsetA_Blk: 8192
     LdsOffsetB: 3072
     LdsOffsetB_Blk: 11264
-    LdsPadA: 0
+    LdsPadA: 16
     LdsPadB: 4
     LocalReadVectorWidth: 4
     LocalSplitU: 1
@@ -6863,7 +6863,7 @@
     LVPA: 4
     LVPB: 8
     LdsBlockSizePerPad: 128
-    LdsBlockSizePerPadA: 0
+    LdsBlockSizePerPadA: 512
     LdsBlockSizePerPadB: 128
     LdsInitCVgprs: false
     LdsNumElements: 14048
@@ -6873,7 +6873,7 @@
     LdsOffsetA_Blk: 8192
     LdsOffsetB: 2048
     LdsOffsetB_Blk: 10240
-    LdsPadA: 0
+    LdsPadA: 16
     LdsPadB: 4
     LocalReadVectorWidth: 4
     LocalSplitU: 1
@@ -7081,7 +7081,7 @@
     LVPA: 2
     LVPB: 8
     LdsBlockSizePerPad: 128
-    LdsBlockSizePerPadA: 0
+    LdsBlockSizePerPadA: 1024
     LdsBlockSizePerPadB: 128
     LdsInitCVgprs: false
     LdsNumElements: 16096
@@ -7091,7 +7091,7 @@
     LdsOffsetA_Blk: 8192
     LdsOffsetB: 4096
     LdsOffsetB_Blk: 12288
-    LdsPadA: 0
+    LdsPadA: 16
     LdsPadB: 4
     LocalReadVectorWidth: 4
     LocalSplitU: 1
@@ -7299,7 +7299,7 @@
     LVPA: 16
     LVPB: 8
     LdsBlockSizePerPad: 128
-    LdsBlockSizePerPadA: 0
+    LdsBlockSizePerPadA: 128
     LdsBlockSizePerPadB: 128
     LdsInitCVgprs: false
     LdsNumElements: 13056
@@ -7309,7 +7309,7 @@
     LdsOffsetA_Blk: 8192
     LdsOffsetB: 512
     LdsOffsetB_Blk: 8704
-    LdsPadA: 0
+    LdsPadA: 16
     LdsPadB: 4
     LocalReadVectorWidth: 4
     LocalSplitU: 1
@@ -7735,7 +7735,7 @@
     LVPA: 16
     LVPB: 8
     LdsBlockSizePerPad: 128
-    LdsBlockSizePerPadA: 0
+    LdsBlockSizePerPadA: 384
     LdsBlockSizePerPadB: 128
     LdsInitCVgprs: false
     LdsNumElements: 14080
@@ -7745,7 +7745,7 @@
     LdsOffsetA_Blk: 8192
     LdsOffsetB: 1536
     LdsOffsetB_Blk: 9728
-    LdsPadA: 0
+    LdsPadA: 16
     LdsPadB: 4
     LocalReadVectorWidth: 4
     LocalSplitU: 1
@@ -8171,7 +8171,7 @@
     LVPA: 16
     LVPB: 8
     LdsBlockSizePerPad: 128
-    LdsBlockSizePerPadA: 0
+    LdsBlockSizePerPadA: 640
     LdsBlockSizePerPadB: 128
     LdsInitCVgprs: false
     LdsNumElements: 15104
@@ -8181,7 +8181,7 @@
     LdsOffsetA_Blk: 8192
     LdsOffsetB: 2560
     LdsOffsetB_Blk: 10752
-    LdsPadA: 0
+    LdsPadA: 16
     LdsPadB: 4
     LocalReadVectorWidth: 4
     LocalSplitU: 1
@@ -8607,7 +8607,7 @@
     LVPA: 16
     LVPB: 8
     LdsBlockSizePerPad: 128
-    LdsBlockSizePerPadA: 0
+    LdsBlockSizePerPadA: 896
     LdsBlockSizePerPadB: 128
     LdsInitCVgprs: false
     LdsNumElements: 16128
@@ -8617,7 +8617,7 @@
     LdsOffsetA_Blk: 8192
     LdsOffsetB: 3584
     LdsOffsetB_Blk: 11776
-    LdsPadA: 0
+    LdsPadA: 16
     LdsPadB: 4
     LocalReadVectorWidth: 4
     LocalSplitU: 1
@@ -9915,7 +9915,7 @@
     LVPA: 4
     LVPB: 8
     LdsBlockSizePerPad: 128
-    LdsBlockSizePerPadA: 0
+    LdsBlockSizePerPadA: 512
     LdsBlockSizePerPadB: 128
     LdsInitCVgprs: false
     LdsNumElements: 15136
@@ -9925,7 +9925,7 @@
     LdsOffsetA_Blk: 8192
     LdsOffsetB: 2048
     LdsOffsetB_Blk: 10240
-    LdsPadA: 0
+    LdsPadA: 16
     LdsPadB: 4
     LocalReadVectorWidth: 4
     LocalSplitU: 1
@@ -10133,7 +10133,7 @@
     LVPA: 1
     LVPB: 8
     LdsBlockSizePerPad: 128
-    LdsBlockSizePerPadA: 0
+    LdsBlockSizePerPadA: 2048
     LdsBlockSizePerPadB: 128
     LdsInitCVgprs: false
     LdsNumElements: 29472
@@ -10143,7 +10143,7 @@
     LdsOffsetA_Blk: 16384
     LdsOffsetB: 8192
     LdsOffsetB_Blk: 24576
-    LdsPadA: 0
+    LdsPadA: 16
     LdsPadB: 4
     LocalReadVectorWidth: 4
     LocalSplitU: 1
@@ -10351,7 +10351,7 @@
     LVPA: 8
     LVPB: 8
     LdsBlockSizePerPad: 128
-    LdsBlockSizePerPadA: 0
+    LdsBlockSizePerPadA: 256
     LdsBlockSizePerPadB: 128
     LdsInitCVgprs: false
     LdsNumElements: 14656
@@ -10361,7 +10361,7 @@
     LdsOffsetA_Blk: 8192
     LdsOffsetB: 1024
     LdsOffsetB_Blk: 9216
-    LdsPadA: 0
+    LdsPadA: 16
     LdsPadB: 4
     LocalReadVectorWidth: 4
     LocalSplitU: 1
@@ -10569,7 +10569,7 @@
     LVPA: 4
     LVPB: 8
     LdsBlockSizePerPad: 128
-    LdsBlockSizePerPadA: 0
+    LdsBlockSizePerPadA: 512
     LdsBlockSizePerPadB: 128
     LdsInitCVgprs: false
     LdsNumElements: 15680
@@ -10579,7 +10579,7 @@
     LdsOffsetA_Blk: 8192
     LdsOffsetB: 2048
     LdsOffsetB_Blk: 10240
-    LdsPadA: 0
+    LdsPadA: 16
     LdsPadB: 4
     LocalReadVectorWidth: 4
     LocalSplitU: 1
@@ -11005,7 +11005,7 @@
     LVPA: 8
     LVPB: 8
     LdsBlockSizePerPad: 128
-    LdsBlockSizePerPadA: 0
+    LdsBlockSizePerPadA: 1792
     LdsBlockSizePerPadB: 128
     LdsInitCVgprs: false
     LdsNumElements: 28992
@@ -11015,7 +11015,7 @@
     LdsOffsetA_Blk: 16384
     LdsOffsetB: 7168
     LdsOffsetB_Blk: 23552
-    LdsPadA: 0
+    LdsPadA: 16
     LdsPadB: 4
     LocalReadVectorWidth: 4
     LocalSplitU: 1
@@ -11441,7 +11441,7 @@
     LVPA: 4
     LVPB: 8
     LdsBlockSizePerPad: 128
-    LdsBlockSizePerPadA: 0
+    LdsBlockSizePerPadA: 512
     LdsBlockSizePerPadB: 128
     LdsInitCVgprs: false
     LdsNumElements: 16224
@@ -11451,7 +11451,7 @@
     LdsOffsetA_Blk: 8192
     LdsOffsetB: 2048
     LdsOffsetB_Blk: 10240
-    LdsPadA: 0
+    LdsPadA: 16
     LdsPadB: 4
     LocalReadVectorWidth: 4
     LocalSplitU: 1
@@ -11659,7 +11659,7 @@
     LVPA: 4
     LVPB: 8
     LdsBlockSizePerPad: 128
-    LdsBlockSizePerPadA: 0
+    LdsBlockSizePerPadA: 1536
     LdsBlockSizePerPadB: 128
     LdsInitCVgprs: false
     LdsNumElements: 28512
@@ -11669,7 +11669,7 @@
     LdsOffsetA_Blk: 16384
     LdsOffsetB: 6144
     LdsOffsetB_Blk: 22528
-    LdsPadA: 0
+    LdsPadA: 16
     LdsPadB: 4
     LocalReadVectorWidth: 4
     LocalSplitU: 1
@@ -11877,7 +11877,7 @@
     LVPA: 1
     LVPB: 8
     LdsBlockSizePerPad: 128
-    LdsBlockSizePerPadA: 0
+    LdsBlockSizePerPadA: 2048
     LdsBlockSizePerPadB: 128
     LdsInitCVgprs: false
     LdsNumElements: 30560
@@ -11887,7 +11887,7 @@
     LdsOffsetA_Blk: 16384
     LdsOffsetB: 8192
     LdsOffsetB_Blk: 24576
-    LdsPadA: 0
+    LdsPadA: 16
     LdsPadB: 4
     LocalReadVectorWidth: 4
     LocalSplitU: 1
@@ -12095,7 +12095,7 @@
     LVPA: 16
     LVPB: 8
     LdsBlockSizePerPad: 128
-    LdsBlockSizePerPadA: 0
+    LdsBlockSizePerPadA: 128
     LdsBlockSizePerPadB: 128
     LdsInitCVgprs: false
     LdsNumElements: 15232
@@ -12105,7 +12105,7 @@
     LdsOffsetA_Blk: 8192
     LdsOffsetB: 512
     LdsOffsetB_Blk: 8704
-    LdsPadA: 0
+    LdsPadA: 16
     LdsPadB: 4
     LocalReadVectorWidth: 4
     LocalSplitU: 1
@@ -12313,7 +12313,7 @@
     LVPA: 8
     LVPB: 8
     LdsBlockSizePerPad: 128
-    LdsBlockSizePerPadA: 0
+    LdsBlockSizePerPadA: 256
     LdsBlockSizePerPadB: 128
     LdsInitCVgprs: false
     LdsNumElements: 15744
@@ -12323,7 +12323,7 @@
     LdsOffsetA_Blk: 8192
     LdsOffsetB: 1024
     LdsOffsetB_Blk: 9216
-    LdsPadA: 0
+    LdsPadA: 16
     LdsPadB: 4
     LocalReadVectorWidth: 4
     LocalSplitU: 1
@@ -12531,7 +12531,7 @@
     LVPA: 16
     LVPB: 8
     LdsBlockSizePerPad: 128
-    LdsBlockSizePerPadA: 0
+    LdsBlockSizePerPadA: 384
     LdsBlockSizePerPadB: 128
     LdsInitCVgprs: false
     LdsNumElements: 16256
@@ -12541,7 +12541,7 @@
     LdsOffsetA_Blk: 8192
     LdsOffsetB: 1536
     LdsOffsetB_Blk: 9728
-    LdsPadA: 0
+    LdsPadA: 16
     LdsPadB: 4
     LocalReadVectorWidth: 4
     LocalSplitU: 1
@@ -13185,7 +13185,7 @@
     LVPA: 16
     LVPB: 8
     LdsBlockSizePerPad: 128
-    LdsBlockSizePerPadA: 0
+    LdsBlockSizePerPadA: 1408
     LdsBlockSizePerPadB: 128
     LdsInitCVgprs: false
     LdsNumElements: 28544
@@ -13195,7 +13195,7 @@
     LdsOffsetA_Blk: 16384
     LdsOffsetB: 5632
     LdsOffsetB_Blk: 22016
-    LdsPadA: 0
+    LdsPadA: 16
     LdsPadB: 4
     LocalReadVectorWidth: 4
     LocalSplitU: 1
@@ -13621,7 +13621,7 @@
     LVPA: 16
     LVPB: 8
     LdsBlockSizePerPad: 128
-    LdsBlockSizePerPadA: 0
+    LdsBlockSizePerPadA: 1664
     LdsBlockSizePerPadB: 128
     LdsInitCVgprs: false
     LdsNumElements: 29568
@@ -13631,7 +13631,7 @@
     LdsOffsetA_Blk: 16384
     LdsOffsetB: 6656
     LdsOffsetB_Blk: 23040
-    LdsPadA: 0
+    LdsPadA: 16
     LdsPadB: 4
     LocalReadVectorWidth: 4
     LocalSplitU: 1
@@ -13839,7 +13839,7 @@
     LVPA: 8
     LVPB: 8
     LdsBlockSizePerPad: 128
-    LdsBlockSizePerPadA: 0
+    LdsBlockSizePerPadA: 1792
     LdsBlockSizePerPadB: 128
     LdsInitCVgprs: false
     LdsNumElements: 30080
@@ -13849,7 +13849,7 @@
     LdsOffsetA_Blk: 16384
     LdsOffsetB: 7168
     LdsOffsetB_Blk: 23552
-    LdsPadA: 0
+    LdsPadA: 16
     LdsPadB: 4
     LocalReadVectorWidth: 4
     LocalSplitU: 1
@@ -14057,7 +14057,7 @@
     LVPA: 16
     LVPB: 8
     LdsBlockSizePerPad: 128
-    LdsBlockSizePerPadA: 0
+    LdsBlockSizePerPadA: 1920
     LdsBlockSizePerPadB: 128
     LdsInitCVgprs: false
     LdsNumElements: 30592
@@ -14067,7 +14067,7 @@
     LdsOffsetA_Blk: 16384
     LdsOffsetB: 7680
     LdsOffsetB_Blk: 24064
-    LdsPadA: 0
+    LdsPadA: 16
     LdsPadB: 4
     LocalReadVectorWidth: 4
     LocalSplitU: 1
@@ -14493,7 +14493,7 @@
     LVPA: 4
     LVPB: 8
     LdsBlockSizePerPad: 128
-    LdsBlockSizePerPadA: 0
+    LdsBlockSizePerPadA: 1536
     LdsBlockSizePerPadB: 128
     LdsInitCVgprs: false
     LdsNumElements: 29600
@@ -14503,7 +14503,7 @@
     LdsOffsetA_Blk: 16384
     LdsOffsetB: 6144
     LdsOffsetB_Blk: 22528
-    LdsPadA: 0
+    LdsPadA: 16
     LdsPadB: 4
     LocalReadVectorWidth: 4
     LocalSplitU: 1
@@ -14711,7 +14711,7 @@
     LVPA: 1
     LVPB: 8
     LdsBlockSizePerPad: 128
-    LdsBlockSizePerPadA: 0
+    LdsBlockSizePerPadA: 2048
     LdsBlockSizePerPadB: 128
     LdsInitCVgprs: false
     LdsNumElements: 31648
@@ -14721,7 +14721,7 @@
     LdsOffsetA_Blk: 16384
     LdsOffsetB: 8192
     LdsOffsetB_Blk: 24576
-    LdsPadA: 0
+    LdsPadA: 16
     LdsPadB: 4
     LocalReadVectorWidth: 4
     LocalSplitU: 1
@@ -15147,7 +15147,7 @@
     LVPA: 8
     LVPB: 8
     LdsBlockSizePerPad: 128
-    LdsBlockSizePerPadA: 0
+    LdsBlockSizePerPadA: 1280
     LdsBlockSizePerPadB: 128
     LdsInitCVgprs: false
     LdsNumElements: 29120
@@ -15157,7 +15157,7 @@
     LdsOffsetA_Blk: 16384
     LdsOffsetB: 5120
     LdsOffsetB_Blk: 21504
-    LdsPadA: 0
+    LdsPadA: 16
     LdsPadB: 4
     LocalReadVectorWidth: 4
     LocalSplitU: 1
@@ -15365,7 +15365,7 @@
     LVPA: 4
     LVPB: 8
     LdsBlockSizePerPad: 128
-    LdsBlockSizePerPadA: 0
+    LdsBlockSizePerPadA: 1536
     LdsBlockSizePerPadB: 128
     LdsInitCVgprs: false
     LdsNumElements: 30144
@@ -15375,7 +15375,7 @@
     LdsOffsetA_Blk: 16384
     LdsOffsetB: 6144
     LdsOffsetB_Blk: 22528
-    LdsPadA: 0
+    LdsPadA: 16
     LdsPadB: 4
     LocalReadVectorWidth: 4
     LocalSplitU: 1
@@ -15583,7 +15583,7 @@
     LVPA: 8
     LVPB: 8
     LdsBlockSizePerPad: 128
-    LdsBlockSizePerPadA: 0
+    LdsBlockSizePerPadA: 1792
     LdsBlockSizePerPadB: 128
     LdsInitCVgprs: false
     LdsNumElements: 31168
@@ -15593,7 +15593,7 @@
     LdsOffsetA_Blk: 16384
     LdsOffsetB: 7168
     LdsOffsetB_Blk: 23552
-    LdsPadA: 0
+    LdsPadA: 16
     LdsPadB: 4
     LocalReadVectorWidth: 4
     LocalSplitU: 1
@@ -16019,7 +16019,7 @@
     LVPA: 4
     LVPB: 8
     LdsBlockSizePerPad: 128
-    LdsBlockSizePerPadA: 0
+    LdsBlockSizePerPadA: 1536
     LdsBlockSizePerPadB: 128
     LdsInitCVgprs: false
     LdsNumElements: 30688
@@ -16029,7 +16029,7 @@
     LdsOffsetA_Blk: 16384
     LdsOffsetB: 6144
     LdsOffsetB_Blk: 22528
-    LdsPadA: 0
+    LdsPadA: 16
     LdsPadB: 4
     LocalReadVectorWidth: 4
     LocalSplitU: 1
@@ -16202,7 +16202,7 @@
     AssignedProblemIndependentDerivedParameters: true
     BufferLoad: true
     BufferStore: true
-    ClusterLocalRead: 1
+    ClusterLocalRead: 0
     CodeObjectVersion: V3
     CustomKernelName: ''
     DepthU: 32
@@ -17109,7 +17109,7 @@
     LVPA: 16
     LVPB: 8
     LdsBlockSizePerPad: 128
-    LdsBlockSizePerPadA: 0
+    LdsBlockSizePerPadA: 1152
     LdsBlockSizePerPadB: 128
     LdsInitCVgprs: false
     LdsNumElements: 29696
@@ -17119,7 +17119,7 @@
     LdsOffsetA_Blk: 16384
     LdsOffsetB: 4608
     LdsOffsetB_Blk: 20992
-    LdsPadA: 0
+    LdsPadA: 16
     LdsPadB: 4
     LocalReadVectorWidth: 4
     LocalSplitU: 1
@@ -17545,7 +17545,7 @@
     LVPA: 16
     LVPB: 8
     LdsBlockSizePerPad: 128
-    LdsBlockSizePerPadA: 0
+    LdsBlockSizePerPadA: 1408
     LdsBlockSizePerPadB: 128
     LdsInitCVgprs: false
     LdsNumElements: 30720
@@ -17555,7 +17555,7 @@
     LdsOffsetA_Blk: 16384
     LdsOffsetB: 5632
     LdsOffsetB_Blk: 22016
-    LdsPadA: 0
+    LdsPadA: 16
     LdsPadB: 4
     LocalReadVectorWidth: 4
     LocalSplitU: 1
@@ -17981,7 +17981,7 @@
     LVPA: 16
     LVPB: 8
     LdsBlockSizePerPad: 128
-    LdsBlockSizePerPadA: 0
+    LdsBlockSizePerPadA: 1664
     LdsBlockSizePerPadB: 128
     LdsInitCVgprs: false
     LdsNumElements: 31744
@@ -17991,7 +17991,7 @@
     LdsOffsetA_Blk: 16384
     LdsOffsetB: 6656
     LdsOffsetB_Blk: 23040
-    LdsPadA: 0
+    LdsPadA: 16
     LdsPadB: 4
     LocalReadVectorWidth: 4
     LocalSplitU: 1
@@ -18382,7 +18382,7 @@
     AssignedProblemIndependentDerivedParameters: true
     BufferLoad: true
     BufferStore: true
-    ClusterLocalRead: 1
+    ClusterLocalRead: 0
     CodeObjectVersion: V3
     CustomKernelName: ''
     DepthU: 32
@@ -18853,7 +18853,7 @@
     LVPA: 8
     LVPB: 4
     LdsBlockSizePerPad: 128
-    LdsBlockSizePerPadA: 0
+    LdsBlockSizePerPadA: 512
     LdsBlockSizePerPadB: 128
     LdsInitCVgprs: false
     LdsNumElements: 12800
@@ -18863,7 +18863,7 @@
     LdsOffsetA_Blk: 8192
     LdsOffsetB: 2048
     LdsOffsetB_Blk: 10240
-    LdsPadA: 0
+    LdsPadA: 16
     LdsPadB: 16
     LocalReadVectorWidth: 8
     LocalSplitU: 1
@@ -19071,7 +19071,7 @@
     LVPA: 4
     LVPB: 4
     LdsBlockSizePerPad: 128
-    LdsBlockSizePerPadA: 0
+    LdsBlockSizePerPadA: 1024
     LdsBlockSizePerPadB: 128
     LdsInitCVgprs: false
     LdsNumElements: 14848
@@ -19081,7 +19081,7 @@
     LdsOffsetA_Blk: 8192
     LdsOffsetB: 4096
     LdsOffsetB_Blk: 12288
-    LdsPadA: 0
+    LdsPadA: 16
     LdsPadB: 16
     LocalReadVectorWidth: 8
     LocalSplitU: 1
@@ -19507,7 +19507,7 @@
     LVPA: 4
     LVPB: 4
     LdsBlockSizePerPad: 128
-    LdsBlockSizePerPadA: 0
+    LdsBlockSizePerPadA: 1024
     LdsBlockSizePerPadB: 128
     LdsInitCVgprs: false
     LdsNumElements: 16128
@@ -19517,7 +19517,7 @@
     LdsOffsetA_Blk: 8192
     LdsOffsetB: 4096
     LdsOffsetB_Blk: 12288
-    LdsPadA: 0
+    LdsPadA: 16
     LdsPadB: 16
     LocalReadVectorWidth: 8
     LocalSplitU: 1
@@ -19725,7 +19725,7 @@
     LVPA: 2
     LVPB: 4
     LdsBlockSizePerPad: 128
-    LdsBlockSizePerPadA: 0
+    LdsBlockSizePerPadA: 2048
     LdsBlockSizePerPadB: 128
     LdsInitCVgprs: false
     LdsNumElements: 12032
@@ -19735,7 +19735,7 @@
     LdsOffsetA_Blk: 16384
     LdsOffsetB: 8192
     LdsOffsetB_Blk: 24576
-    LdsPadA: 0
+    LdsPadA: 16
     LdsPadB: 16
     LocalReadVectorWidth: 8
     LocalSplitU: 1
@@ -19943,7 +19943,7 @@
     LVPA: 4
     LVPB: 4
     LdsBlockSizePerPad: 128
-    LdsBlockSizePerPadA: 0
+    LdsBlockSizePerPadA: 3072
     LdsBlockSizePerPadB: 128
     LdsInitCVgprs: false
     LdsNumElements: 16128
@@ -19953,7 +19953,7 @@
     LdsOffsetA_Blk: 16384
     LdsOffsetB: 12288
     LdsOffsetB_Blk: 28672
-    LdsPadA: 0
+    LdsPadA: 16
     LdsPadB: 16
     LocalReadVectorWidth: 8
     LocalSplitU: 1
@@ -20161,7 +20161,7 @@
     LVPA: 1
     LVPB: 4
     LdsBlockSizePerPad: 128
-    LdsBlockSizePerPadA: 0
+    LdsBlockSizePerPadA: 4096
     LdsBlockSizePerPadB: 128
     LdsInitCVgprs: false
     LdsNumElements: 20224
@@ -20171,7 +20171,7 @@
     LdsOffsetA_Blk: 32768
     LdsOffsetB: 16384
     LdsOffsetB_Blk: 49152
-    LdsPadA: 0
+    LdsPadA: 16
     LdsPadB: 16
     LocalReadVectorWidth: 8
     LocalSplitU: 1
@@ -20379,7 +20379,7 @@
     LVPA: 16
     LVPB: 4
     LdsBlockSizePerPad: 128
-    LdsBlockSizePerPadA: 0
+    LdsBlockSizePerPadA: 256
     LdsBlockSizePerPadB: 128
     LdsInitCVgprs: false
     LdsNumElements: 14336
@@ -20389,7 +20389,7 @@
     LdsOffsetA_Blk: 8192
     LdsOffsetB: 1024
     LdsOffsetB_Blk: 9216
-    LdsPadA: 0
+    LdsPadA: 16
     LdsPadB: 16
     LocalReadVectorWidth: 8
     LocalSplitU: 1
@@ -20597,7 +20597,7 @@
     LVPA: 8
     LVPB: 4
     LdsBlockSizePerPad: 128
-    LdsBlockSizePerPadA: 0
+    LdsBlockSizePerPadA: 512
     LdsBlockSizePerPadB: 128
     LdsInitCVgprs: false
     LdsNumElements: 15360
@@ -20607,7 +20607,7 @@
     LdsOffsetA_Blk: 8192
     LdsOffsetB: 2048
     LdsOffsetB_Blk: 10240
-    LdsPadA: 0
+    LdsPadA: 16
     LdsPadB: 16
     LocalReadVectorWidth: 8
     LocalSplitU: 1
@@ -20815,7 +20815,7 @@
     LVPA: 16
     LVPB: 4
     LdsBlockSizePerPad: 128
-    LdsBlockSizePerPadA: 0
+    LdsBlockSizePerPadA: 768
     LdsBlockSizePerPadB: 128
     LdsInitCVgprs: false
     LdsNumElements: 16384
@@ -20825,7 +20825,7 @@
     LdsOffsetA_Blk: 8192
     LdsOffsetB: 3072
     LdsOffsetB_Blk: 11264
-    LdsPadA: 0
+    LdsPadA: 16
     LdsPadB: 16
     LocalReadVectorWidth: 8
     LocalSplitU: 1
@@ -21687,7 +21687,7 @@
     LVPA: 4
     LVPB: 4
     LdsBlockSizePerPad: 128
-    LdsBlockSizePerPadA: 0
+    LdsBlockSizePerPadA: 1024
     LdsBlockSizePerPadB: 128
     LdsInitCVgprs: false
     LdsNumElements: 10496
@@ -21697,7 +21697,7 @@
     LdsOffsetA_Blk: 16384
     LdsOffsetB: 4096
     LdsOffsetB_Blk: 20480
-    LdsPadA: 0
+    LdsPadA: 16
     LdsPadB: 16
     LocalReadVectorWidth: 8
     LocalSplitU: 1
@@ -21905,7 +21905,7 @@
     LVPA: 2
     LVPB: 4
     LdsBlockSizePerPad: 128
-    LdsBlockSizePerPadA: 0
+    LdsBlockSizePerPadA: 2048
     LdsBlockSizePerPadB: 128
     LdsInitCVgprs: false
     LdsNumElements: 14592
@@ -21915,7 +21915,7 @@
     LdsOffsetA_Blk: 16384
     LdsOffsetB: 8192
     LdsOffsetB_Blk: 24576
-    LdsPadA: 0
+    LdsPadA: 16
     LdsPadB: 16
     LocalReadVectorWidth: 8
     LocalSplitU: 1
@@ -22123,7 +22123,7 @@
     LVPA: 4
     LVPB: 4
     LdsBlockSizePerPad: 128
-    LdsBlockSizePerPadA: 0
+    LdsBlockSizePerPadA: 3072
     LdsBlockSizePerPadB: 128
     LdsInitCVgprs: false
     LdsNumElements: 18688
@@ -22133,7 +22133,7 @@
     LdsOffsetA_Blk: 32768
     LdsOffsetB: 12288
     LdsOffsetB_Blk: 45056
-    LdsPadA: 0
+    LdsPadA: 16
     LdsPadB: 16
     LocalReadVectorWidth: 8
     LocalSplitU: 1
@@ -22341,7 +22341,7 @@
     LVPA: 1
     LVPB: 4
     LdsBlockSizePerPad: 128
-    LdsBlockSizePerPadA: 0
+    LdsBlockSizePerPadA: 4096
     LdsBlockSizePerPadB: 128
     LdsInitCVgprs: false
     LdsNumElements: 22784
@@ -22351,7 +22351,7 @@
     LdsOffsetA_Blk: 32768
     LdsOffsetB: 16384
     LdsOffsetB_Blk: 49152
-    LdsPadA: 0
+    LdsPadA: 16
     LdsPadB: 16
     LocalReadVectorWidth: 8
     LocalSplitU: 1
@@ -22559,7 +22559,7 @@
     LVPA: 4
     LVPB: 4
     LdsBlockSizePerPad: 128
-    LdsBlockSizePerPadA: 0
+    LdsBlockSizePerPadA: 1024
     LdsBlockSizePerPadB: 128
     LdsInitCVgprs: false
     LdsNumElements: 11776
@@ -22569,7 +22569,7 @@
     LdsOffsetA_Blk: 16384
     LdsOffsetB: 4096
     LdsOffsetB_Blk: 20480
-    LdsPadA: 0
+    LdsPadA: 16
     LdsPadB: 16
     LocalReadVectorWidth: 8
     LocalSplitU: 1
@@ -22777,7 +22777,7 @@
     LVPA: 8
     LVPB: 4
     LdsBlockSizePerPad: 128
-    LdsBlockSizePerPadA: 0
+    LdsBlockSizePerPadA: 1536
     LdsBlockSizePerPadB: 128
     LdsInitCVgprs: false
     LdsNumElements: 13824
@@ -22787,7 +22787,7 @@
     LdsOffsetA_Blk: 16384
     LdsOffsetB: 6144
     LdsOffsetB_Blk: 22528
-    LdsPadA: 0
+    LdsPadA: 16
     LdsPadB: 16
     LocalReadVectorWidth: 8
     LocalSplitU: 1
@@ -23178,7 +23178,7 @@
     AssignedProblemIndependentDerivedParameters: true
     BufferLoad: true
     BufferStore: true
-    ClusterLocalRead: 1
+    ClusterLocalRead: 0
     CodeObjectVersion: V3
     CustomKernelName: ''
     DepthU: 64
@@ -23225,7 +23225,7 @@
     LdsOffsetB_Blk: 43008
     LdsPadA: 0
     LdsPadB: 16
-    LocalReadVectorWidth: 8
+    LocalReadVectorWidth: 4
     LocalSplitU: 1
     LocalWritePerMfma: -1
     LocalWriteUseSgprA: false
@@ -23431,7 +23431,7 @@
     LVPA: 4
     LVPB: 4
     LdsBlockSizePerPad: 128
-    LdsBlockSizePerPadA: 0
+    LdsBlockSizePerPadA: 3072
     LdsBlockSizePerPadB: 128
     LdsInitCVgprs: false
     LdsNumElements: 19968
@@ -23441,7 +23441,7 @@
     LdsOffsetA_Blk: 32768
     LdsOffsetB: 12288
     LdsOffsetB_Blk: 45056
-    LdsPadA: 0
+    LdsPadA: 16
     LdsPadB: 16
     LocalReadVectorWidth: 8
     LocalSplitU: 1
@@ -23649,7 +23649,7 @@
     LVPA: 8
     LVPB: 4
     LdsBlockSizePerPad: 128
-    LdsBlockSizePerPadA: 0
+    LdsBlockSizePerPadA: 3584
     LdsBlockSizePerPadB: 128
     LdsInitCVgprs: false
     LdsNumElements: 22016
@@ -23659,7 +23659,7 @@
     LdsOffsetA_Blk: 32768
     LdsOffsetB: 14336
     LdsOffsetB_Blk: 47104
-    LdsPadA: 0
+    LdsPadA: 16
     LdsPadB: 16
     LocalReadVectorWidth: 8
     LocalSplitU: 1
@@ -24085,7 +24085,7 @@
     LVPA: 4
     LVPB: 4
     LdsBlockSizePerPad: 128
-    LdsBlockSizePerPadA: 0
+    LdsBlockSizePerPadA: 1024
     LdsBlockSizePerPadB: 128
     LdsInitCVgprs: false
     LdsNumElements: 13056
@@ -24095,7 +24095,7 @@
     LdsOffsetA_Blk: 16384
     LdsOffsetB: 4096
     LdsOffsetB_Blk: 20480
-    LdsPadA: 0
+    LdsPadA: 16
     LdsPadB: 16
     LocalReadVectorWidth: 8
     LocalSplitU: 1
@@ -24303,7 +24303,7 @@
     LVPA: 2
     LVPB: 4
     LdsBlockSizePerPad: 128
-    LdsBlockSizePerPadA: 0
+    LdsBlockSizePerPadA: 2048
     LdsBlockSizePerPadB: 128
     LdsInitCVgprs: false
     LdsNumElements: 17152
@@ -24313,7 +24313,7 @@
     LdsOffsetA_Blk: 32768
     LdsOffsetB: 8192
     LdsOffsetB_Blk: 40960
-    LdsPadA: 0
+    LdsPadA: 16
     LdsPadB: 16
     LocalReadVectorWidth: 8
     LocalSplitU: 1
@@ -24521,7 +24521,7 @@
     LVPA: 4
     LVPB: 4
     LdsBlockSizePerPad: 128
-    LdsBlockSizePerPadA: 0
+    LdsBlockSizePerPadA: 3072
     LdsBlockSizePerPadB: 128
     LdsInitCVgprs: false
     LdsNumElements: 21248
@@ -24531,7 +24531,7 @@
     LdsOffsetA_Blk: 32768
     LdsOffsetB: 12288
     LdsOffsetB_Blk: 45056
-    LdsPadA: 0
+    LdsPadA: 16
     LdsPadB: 16
     LocalReadVectorWidth: 8
     LocalSplitU: 1
@@ -24739,7 +24739,7 @@
     LVPA: 1
     LVPB: 4
     LdsBlockSizePerPad: 128
-    LdsBlockSizePerPadA: 0
+    LdsBlockSizePerPadA: 4096
     LdsBlockSizePerPadB: 128
     LdsInitCVgprs: false
     LdsNumElements: 25344
@@ -24749,7 +24749,7 @@
     LdsOffsetA_Blk: 32768
     LdsOffsetB: 16384
     LdsOffsetB_Blk: 49152
-    LdsPadA: 0
+    LdsPadA: 16
     LdsPadB: 16
     LocalReadVectorWidth: 8
     LocalSplitU: 1
@@ -26002,7 +26002,7 @@
     _WorkspaceSizePerElemC: 0
     _staggerStrideShift: 0
     allowLRVWforTLUandMI: false
-  - 1LDSBuffer: 1
+  - 1LDSBuffer: 0
     ActivationFuncCall: true
     ActivationFused: true
     AssertFree0ElementMultiple: 1
@@ -26012,7 +26012,7 @@
     AssignedProblemIndependentDerivedParameters: true
     BufferLoad: true
     BufferStore: true
-    ClusterLocalRead: 1
+    ClusterLocalRead: 0
     CodeObjectVersion: V3
     CustomKernelName: ''
     DepthU: 64
@@ -26059,7 +26059,7 @@
     LdsOffsetB_Blk: 47104
     LdsPadA: 0
     LdsPadB: 8
-    LocalReadVectorWidth: 8
+    LocalReadVectorWidth: 4
     LocalSplitU: 1
     LocalWritePerMfma: -1
     LocalWriteUseSgprA: false
@@ -26113,7 +26113,7 @@
     PackedC0IndicesX: [0]
     PackedC1IdxChars: [J]
     PackedC1IndicesX: [1]
-    PrefetchGlobalRead: 2
+    PrefetchGlobalRead: 0
     PrefetchLocalRead: 1
     ProblemType:
       Activation: true
@@ -26483,7 +26483,7 @@
     LVPA: 4
     LVPB: 4
     LdsBlockSizePerPad: 128
-    LdsBlockSizePerPadA: 0
+    LdsBlockSizePerPadA: 1024
     LdsBlockSizePerPadB: 128
     LdsInitCVgprs: false
     LdsNumElements: 15616
@@ -26493,7 +26493,7 @@
     LdsOffsetA_Blk: 16384
     LdsOffsetB: 4096
     LdsOffsetB_Blk: 20480
-    LdsPadA: 0
+    LdsPadA: 16
     LdsPadB: 16
     LocalReadVectorWidth: 8
     LocalSplitU: 1
@@ -26701,7 +26701,7 @@
     LVPA: 2
     LVPB: 4
     LdsBlockSizePerPad: 128
-    LdsBlockSizePerPadA: 0
+    LdsBlockSizePerPadA: 2048
     LdsBlockSizePerPadB: 128
     LdsInitCVgprs: false
     LdsNumElements: 19712
@@ -26711,7 +26711,7 @@
     LdsOffsetA_Blk: 32768
     LdsOffsetB: 8192
     LdsOffsetB_Blk: 40960
-    LdsPadA: 0
+    LdsPadA: 16
     LdsPadB: 16
     LocalReadVectorWidth: 8
     LocalSplitU: 1
@@ -26919,7 +26919,7 @@
     LVPA: 4
     LVPB: 4
     LdsBlockSizePerPad: 128
-    LdsBlockSizePerPadA: 0
+    LdsBlockSizePerPadA: 3072
     LdsBlockSizePerPadB: 128
     LdsInitCVgprs: false
     LdsNumElements: 23808
@@ -26929,7 +26929,7 @@
     LdsOffsetA_Blk: 32768
     LdsOffsetB: 12288
     LdsOffsetB_Blk: 45056
-    LdsPadA: 0
+    LdsPadA: 16
     LdsPadB: 16
     LocalReadVectorWidth: 8
     LocalSplitU: 1
@@ -27102,7 +27102,7 @@
     AssignedProblemIndependentDerivedParameters: true
     BufferLoad: true
     BufferStore: true
-    ClusterLocalRead: 1
+    ClusterLocalRead: 0
     CodeObjectVersion: V3
     CustomKernelName: ''
     DepthU: 64
@@ -27149,7 +27149,7 @@
     LdsOffsetB_Blk: 49152
     LdsPadA: 0
     LdsPadB: 16
-    LocalReadVectorWidth: 8
+    LocalReadVectorWidth: 4
     LocalSplitU: 1
     LocalWritePerMfma: -1
     LocalWriteUseSgprA: false
@@ -27355,7 +27355,7 @@
     LVPA: 8
     LVPB: 4
     LdsBlockSizePerPad: 128
-    LdsBlockSizePerPadA: 0
+    LdsBlockSizePerPadA: 512
     LdsBlockSizePerPadB: 128
     LdsInitCVgprs: false
     LdsNumElements: 14848
@@ -27365,7 +27365,7 @@
     LdsOffsetA_Blk: 16384
     LdsOffsetB: 2048
     LdsOffsetB_Blk: 18432
-    LdsPadA: 0
+    LdsPadA: 16
     LdsPadB: 16
     LocalReadVectorWidth: 8
     LocalSplitU: 1
@@ -27573,7 +27573,7 @@
     LVPA: 4
     LVPB: 4
     LdsBlockSizePerPad: 128
-    LdsBlockSizePerPadA: 0
+    LdsBlockSizePerPadA: 1024
     LdsBlockSizePerPadB: 128
     LdsInitCVgprs: false
     LdsNumElements: 16896
@@ -27583,7 +27583,7 @@
     LdsOffsetA_Blk: 32768
     LdsOffsetB: 4096
     LdsOffsetB_Blk: 36864
-    LdsPadA: 0
+    LdsPadA: 16
     LdsPadB: 16
     LocalReadVectorWidth: 8
     LocalSplitU: 1
@@ -27756,7 +27756,7 @@
     AssignedProblemIndependentDerivedParameters: true
     BufferLoad: true
     BufferStore: true
-    ClusterLocalRead: 1
+    ClusterLocalRead: 0
     CodeObjectVersion: V3
     CustomKernelName: ''
     DepthU: 64
@@ -27803,7 +27803,7 @@
     LdsOffsetB_Blk: 38912
     LdsPadA: 0
     LdsPadB: 16
-    LocalReadVectorWidth: 8
+    LocalReadVectorWidth: 4
     LocalSplitU: 1
     LocalWritePerMfma: -1
     LocalWriteUseSgprA: false
@@ -28227,7 +28227,7 @@
     LVPA: 8
     LVPB: 4
     LdsBlockSizePerPad: 128
-    LdsBlockSizePerPadA: 0
+    LdsBlockSizePerPadA: 2560
     LdsBlockSizePerPadB: 128
     LdsInitCVgprs: false
     LdsNumElements: 23040
@@ -28237,7 +28237,7 @@
     LdsOffsetA_Blk: 32768
     LdsOffsetB: 10240
     LdsOffsetB_Blk: 43008
-    LdsPadA: 0
+    LdsPadA: 16
     LdsPadB: 16
     LocalReadVectorWidth: 8
     LocalSplitU: 1
@@ -28445,7 +28445,7 @@
     LVPA: 4
     LVPB: 4
     LdsBlockSizePerPad: 128
-    LdsBlockSizePerPadA: 0
+    LdsBlockSizePerPadA: 3072
     LdsBlockSizePerPadB: 128
     LdsInitCVgprs: false
     LdsNumElements: 25088
@@ -28455,7 +28455,7 @@
     LdsOffsetA_Blk: 32768
     LdsOffsetB: 12288
     LdsOffsetB_Blk: 45056
-    LdsPadA: 0
+    LdsPadA: 16
     LdsPadB: 16
     LocalReadVectorWidth: 8
     LocalSplitU: 1
@@ -28628,7 +28628,7 @@
     AssignedProblemIndependentDerivedParameters: true
     BufferLoad: true
     BufferStore: true
-    ClusterLocalRead: 1
+    ClusterLocalRead: 0
     CodeObjectVersion: V3
     CustomKernelName: ''
     DepthU: 64
@@ -28675,7 +28675,7 @@
     LdsOffsetB_Blk: 47104
     LdsPadA: 0
     LdsPadB: 16
-    LocalReadVectorWidth: 8
+    LocalReadVectorWidth: 4
     LocalSplitU: 1
     LocalWritePerMfma: -1
     LocalWriteUseSgprA: false
@@ -28846,7 +28846,7 @@
     AssignedProblemIndependentDerivedParameters: true
     BufferLoad: true
     BufferStore: true
-    ClusterLocalRead: 1
+    ClusterLocalRead: 0
     CodeObjectVersion: V3
     CustomKernelName: ''
     DepthU: 64
@@ -28893,7 +28893,7 @@
     LdsOffsetB_Blk: 49152
     LdsPadA: 0
     LdsPadB: 8
-    LocalReadVectorWidth: 8
+    LocalReadVectorWidth: 4
     LocalSplitU: 1
     LocalWritePerMfma: -1
     LocalWriteUseSgprA: false
@@ -29099,7 +29099,7 @@
     LVPA: 4
     LVPB: 4
     LdsBlockSizePerPad: 128
-    LdsBlockSizePerPadA: 0
+    LdsBlockSizePerPadA: 1024
     LdsBlockSizePerPadB: 128
     LdsInitCVgprs: false
     LdsNumElements: 18176
@@ -29109,7 +29109,7 @@
     LdsOffsetA_Blk: 32768
     LdsOffsetB: 4096
     LdsOffsetB_Blk: 36864
-    LdsPadA: 0
+    LdsPadA: 16
     LdsPadB: 16
     LocalReadVectorWidth: 8
     LocalSplitU: 1
@@ -29317,7 +29317,7 @@
     LVPA: 2
     LVPB: 4
     LdsBlockSizePerPad: 128
-    LdsBlockSizePerPadA: 0
+    LdsBlockSizePerPadA: 2048
     LdsBlockSizePerPadB: 128
     LdsInitCVgprs: false
     LdsNumElements: 22272
@@ -29327,7 +29327,7 @@
     LdsOffsetA_Blk: 32768
     LdsOffsetB: 8192
     LdsOffsetB_Blk: 40960
-    LdsPadA: 0
+    LdsPadA: 16
     LdsPadB: 16
     LocalReadVectorWidth: 8
     LocalSplitU: 1
@@ -29535,7 +29535,7 @@
     LVPA: 4
     LVPB: 4
     LdsBlockSizePerPad: 128
-    LdsBlockSizePerPadA: 0
+    LdsBlockSizePerPadA: 3072
     LdsBlockSizePerPadB: 128
     LdsInitCVgprs: false
     LdsNumElements: 26368
@@ -29545,7 +29545,7 @@
     LdsOffsetA_Blk: 32768
     LdsOffsetB: 12288
     LdsOffsetB_Blk: 45056
-    LdsPadA: 0
+    LdsPadA: 16
     LdsPadB: 16
     LocalReadVectorWidth: 8
     LocalSplitU: 1
@@ -29753,7 +29753,7 @@
     LVPA: 1
     LVPB: 4
     LdsBlockSizePerPad: 128
-    LdsBlockSizePerPadA: 0
+    LdsBlockSizePerPadA: 4096
     LdsBlockSizePerPadB: 128
     LdsInitCVgprs: false
     LdsNumElements: 30464
@@ -29763,7 +29763,7 @@
     LdsOffsetA_Blk: 32768
     LdsOffsetB: 16384
     LdsOffsetB_Blk: 49152
-    LdsPadA: 0
+    LdsPadA: 16
     LdsPadB: 16
     LocalReadVectorWidth: 8
     LocalSplitU: 1
@@ -29971,7 +29971,7 @@
     LVPA: 8
     LVPB: 4
     LdsBlockSizePerPad: 128
-    LdsBlockSizePerPadA: 0
+    LdsBlockSizePerPadA: 512
     LdsBlockSizePerPadB: 128
     LdsInitCVgprs: false
     LdsNumElements: 17408
@@ -29981,7 +29981,7 @@
     LdsOffsetA_Blk: 32768
     LdsOffsetB: 2048
     LdsOffsetB_Blk: 34816
-    LdsPadA: 0
+    LdsPadA: 16
     LdsPadB: 16
     LocalReadVectorWidth: 8
     LocalSplitU: 1
@@ -30189,7 +30189,7 @@
     LVPA: 16
     LVPB: 4
     LdsBlockSizePerPad: 128
-    LdsBlockSizePerPadA: 0
+    LdsBlockSizePerPadA: 768
     LdsBlockSizePerPadB: 128
     LdsInitCVgprs: false
     LdsNumElements: 18432
@@ -30199,7 +30199,7 @@
     LdsOffsetA_Blk: 32768
     LdsOffsetB: 3072
     LdsOffsetB_Blk: 35840
-    LdsPadA: 0
+    LdsPadA: 16
     LdsPadB: 16
     LocalReadVectorWidth: 8
     LocalSplitU: 1
@@ -30625,7 +30625,7 @@
     LVPA: 16
     LVPB: 4
     LdsBlockSizePerPad: 128
-    LdsBlockSizePerPadA: 0
+    LdsBlockSizePerPadA: 1280
     LdsBlockSizePerPadB: 128
     LdsInitCVgprs: false
     LdsNumElements: 20480
@@ -30635,7 +30635,7 @@
     LdsOffsetA_Blk: 32768
     LdsOffsetB: 5120
     LdsOffsetB_Blk: 37888
-    LdsPadA: 0
+    LdsPadA: 16
     LdsPadB: 16
     LocalReadVectorWidth: 8
     LocalSplitU: 1
@@ -30843,7 +30843,7 @@
     LVPA: 8
     LVPB: 4
     LdsBlockSizePerPad: 128
-    LdsBlockSizePerPadA: 0
+    LdsBlockSizePerPadA: 1536
     LdsBlockSizePerPadB: 128
     LdsInitCVgprs: false
     LdsNumElements: 21504
@@ -30853,7 +30853,7 @@
     LdsOffsetA_Blk: 32768
     LdsOffsetB: 6144
     LdsOffsetB_Blk: 38912
-    LdsPadA: 0
+    LdsPadA: 16
     LdsPadB: 16
     LocalReadVectorWidth: 8
     LocalSplitU: 1
@@ -31061,7 +31061,7 @@
     LVPA: 16
     LVPB: 4
     LdsBlockSizePerPad: 128
-    LdsBlockSizePerPadA: 0
+    LdsBlockSizePerPadA: 1792
     LdsBlockSizePerPadB: 128
     LdsInitCVgprs: false
     LdsNumElements: 22528
@@ -31071,7 +31071,7 @@
     LdsOffsetA_Blk: 32768
     LdsOffsetB: 7168
     LdsOffsetB_Blk: 39936
-    LdsPadA: 0
+    LdsPadA: 16
     LdsPadB: 16
     LocalReadVectorWidth: 8
     LocalSplitU: 1
@@ -31497,7 +31497,7 @@
     LVPA: 16
     LVPB: 4
     LdsBlockSizePerPad: 128
-    LdsBlockSizePerPadA: 0
+    LdsBlockSizePerPadA: 2304
     LdsBlockSizePerPadB: 128
     LdsInitCVgprs: false
     LdsNumElements: 24576
@@ -31507,7 +31507,7 @@
     LdsOffsetA_Blk: 32768
     LdsOffsetB: 9216
     LdsOffsetB_Blk: 41984
-    LdsPadA: 0
+    LdsPadA: 16
     LdsPadB: 16
     LocalReadVectorWidth: 8
     LocalSplitU: 1
@@ -31715,7 +31715,7 @@
     LVPA: 8
     LVPB: 4
     LdsBlockSizePerPad: 128
-    LdsBlockSizePerPadA: 0
+    LdsBlockSizePerPadA: 2560
     LdsBlockSizePerPadB: 128
     LdsInitCVgprs: false
     LdsNumElements: 25600
@@ -31725,7 +31725,7 @@
     LdsOffsetA_Blk: 32768
     LdsOffsetB: 10240
     LdsOffsetB_Blk: 43008
-    LdsPadA: 0
+    LdsPadA: 16
     LdsPadB: 16
     LocalReadVectorWidth: 8
     LocalSplitU: 1
@@ -31898,7 +31898,7 @@
     AssignedProblemIndependentDerivedParameters: true
     BufferLoad: true
     BufferStore: true
-    ClusterLocalRead: 1
+    ClusterLocalRead: 0
     CodeObjectVersion: V3
     CustomKernelName: ''
     DepthU: 64
@@ -31945,7 +31945,7 @@
     LdsOffsetB_Blk: 44032
     LdsPadA: 0
     LdsPadB: 16
-    LocalReadVectorWidth: 8
+    LocalReadVectorWidth: 4
     LocalSplitU: 1
     LocalWritePerMfma: -1
     LocalWriteUseSgprA: false
@@ -32116,7 +32116,7 @@
     AssignedProblemIndependentDerivedParameters: true
     BufferLoad: true
     BufferStore: true
-    ClusterLocalRead: 1
+    ClusterLocalRead: 0
     CodeObjectVersion: V3
     CustomKernelName: ''
     DepthU: 64
@@ -32163,7 +32163,7 @@
     LdsOffsetB_Blk: 45056
     LdsPadA: 0
     LdsPadB: 8
-    LocalReadVectorWidth: 8
+    LocalReadVectorWidth: 4
     LocalSplitU: 1
     LocalWritePerMfma: -1
     LocalWriteUseSgprA: false
@@ -32369,7 +32369,7 @@
     LVPA: 8
     LVPB: 4
     LdsBlockSizePerPad: 128
-    LdsBlockSizePerPadA: 0
+    LdsBlockSizePerPadA: 3584
     LdsBlockSizePerPadB: 128
     LdsInitCVgprs: false
     LdsNumElements: 29696
@@ -32379,7 +32379,7 @@
     LdsOffsetA_Blk: 32768
     LdsOffsetB: 14336
     LdsOffsetB_Blk: 47104
-    LdsPadA: 0
+    LdsPadA: 16
     LdsPadB: 16
     LocalReadVectorWidth: 8
     LocalSplitU: 1
@@ -32805,7 +32805,7 @@
     LVPA: 4
     LVPB: 4
     LdsBlockSizePerPad: 128
-    LdsBlockSizePerPadA: 0
+    LdsBlockSizePerPadA: 1024
     LdsBlockSizePerPadB: 128
     LdsInitCVgprs: false
     LdsNumElements: 20736
@@ -32815,7 +32815,7 @@
     LdsOffsetA_Blk: 32768
     LdsOffsetB: 4096
     LdsOffsetB_Blk: 36864
-    LdsPadA: 0
+    LdsPadA: 16
     LdsPadB: 16
     LocalReadVectorWidth: 8
     LocalSplitU: 1
@@ -33023,7 +33023,7 @@
     LVPA: 2
     LVPB: 4
     LdsBlockSizePerPad: 128
-    LdsBlockSizePerPadA: 0
+    LdsBlockSizePerPadA: 2048
     LdsBlockSizePerPadB: 128
     LdsInitCVgprs: false
     LdsNumElements: 24832
@@ -33033,7 +33033,7 @@
     LdsOffsetA_Blk: 32768
     LdsOffsetB: 8192
     LdsOffsetB_Blk: 40960
-    LdsPadA: 0
+    LdsPadA: 16
     LdsPadB: 16
     LocalReadVectorWidth: 8
     LocalSplitU: 1
@@ -33241,7 +33241,7 @@
     LVPA: 4
     LVPB: 4
     LdsBlockSizePerPad: 128
-    LdsBlockSizePerPadA: 0
+    LdsBlockSizePerPadA: 3072
     LdsBlockSizePerPadB: 128
     LdsInitCVgprs: false
     LdsNumElements: 28928
@@ -33251,7 +33251,7 @@
     LdsOffsetA_Blk: 32768
     LdsOffsetB: 12288
     LdsOffsetB_Blk: 45056
-    LdsPadA: 0
+    LdsPadA: 16
     LdsPadB: 16
     LocalReadVectorWidth: 8
     LocalSplitU: 1
@@ -33459,7 +33459,7 @@
     LVPA: 8
     LVPB: 4
     LdsBlockSizePerPad: 128
-    LdsBlockSizePerPadA: 0
+    LdsBlockSizePerPadA: 512
     LdsBlockSizePerPadB: 128
     LdsInitCVgprs: false
     LdsNumElements: 19968
@@ -33469,7 +33469,7 @@
     LdsOffsetA_Blk: 32768
     LdsOffsetB: 2048
     LdsOffsetB_Blk: 34816
-    LdsPadA: 0
+    LdsPadA: 16
     LdsPadB: 16
     LocalReadVectorWidth: 8
     LocalSplitU: 1
@@ -33677,7 +33677,7 @@
     LVPA: 4
     LVPB: 4
     LdsBlockSizePerPad: 128
-    LdsBlockSizePerPadA: 0
+    LdsBlockSizePerPadA: 1024
     LdsBlockSizePerPadB: 128
     LdsInitCVgprs: false
     LdsNumElements: 22016
@@ -33687,7 +33687,7 @@
     LdsOffsetA_Blk: 32768
     LdsOffsetB: 4096
     LdsOffsetB_Blk: 36864
-    LdsPadA: 0
+    LdsPadA: 16
     LdsPadB: 16
     LocalReadVectorWidth: 8
     LocalSplitU: 1
@@ -33895,7 +33895,7 @@
     LVPA: 8
     LVPB: 4
     LdsBlockSizePerPad: 128
-    LdsBlockSizePerPadA: 0
+    LdsBlockSizePerPadA: 1536
     LdsBlockSizePerPadB: 128
     LdsInitCVgprs: false
     LdsNumElements: 24064
@@ -33905,7 +33905,7 @@
     LdsOffsetA_Blk: 32768
     LdsOffsetB: 6144
     LdsOffsetB_Blk: 38912
-    LdsPadA: 0
+    LdsPadA: 16
     LdsPadB: 16
     LocalReadVectorWidth: 8
     LocalSplitU: 1
@@ -34068,7 +34068,7 @@
     _WorkspaceSizePerElemC: 0
     _staggerStrideShift: 0
     allowLRVWforTLUandMI: false
-  - 1LDSBuffer: 1
+  - 1LDSBuffer: 0
     ActivationFuncCall: true
     ActivationFused: true
     AssertFree0ElementMultiple: 1
@@ -34078,7 +34078,7 @@
     AssignedProblemIndependentDerivedParameters: true
     BufferLoad: true
     BufferStore: true
-    ClusterLocalRead: 1
+    ClusterLocalRead: 0
     CodeObjectVersion: V3
     CustomKernelName: ''
     DepthU: 64
@@ -34125,7 +34125,7 @@
     LdsOffsetB_Blk: 40960
     LdsPadA: 0
     LdsPadB: 8
-    LocalReadVectorWidth: 8
+    LocalReadVectorWidth: 4
     LocalSplitU: 1
     LocalWritePerMfma: -1
     LocalWriteUseSgprA: false
@@ -34179,7 +34179,7 @@
     PackedC0IndicesX: [0]
     PackedC1IdxChars: [J]
     PackedC1IndicesX: [1]
-    PrefetchGlobalRead: 2
+    PrefetchGlobalRead: 0
     PrefetchLocalRead: 1
     ProblemType:
       Activation: true
@@ -34296,7 +34296,7 @@
     AssignedProblemIndependentDerivedParameters: true
     BufferLoad: true
     BufferStore: true
-    ClusterLocalRead: 1
+    ClusterLocalRead: 0
     CodeObjectVersion: V3
     CustomKernelName: ''
     DepthU: 64
@@ -34343,7 +34343,7 @@
     LdsOffsetB_Blk: 43008
     LdsPadA: 0
     LdsPadB: 16
-    LocalReadVectorWidth: 8
+    LocalReadVectorWidth: 4
     LocalSplitU: 1
     LocalWritePerMfma: -1
     LocalWriteUseSgprA: false
@@ -34549,7 +34549,7 @@
     LVPA: 4
     LVPB: 4
     LdsBlockSizePerPad: 128
-    LdsBlockSizePerPadA: 0
+    LdsBlockSizePerPadA: 3072
     LdsBlockSizePerPadB: 128
     LdsInitCVgprs: false
     LdsNumElements: 30208
@@ -34559,7 +34559,7 @@
     LdsOffsetA_Blk: 32768
     LdsOffsetB: 12288
     LdsOffsetB_Blk: 45056
-    LdsPadA: 0
+    LdsPadA: 16
     LdsPadB: 16
     LocalReadVectorWidth: 8
     LocalSplitU: 1
@@ -34732,7 +34732,7 @@
     AssignedProblemIndependentDerivedParameters: true
     BufferLoad: true
     BufferStore: true
-    ClusterLocalRead: 1
+    ClusterLocalRead: 0
     CodeObjectVersion: V3
     CustomKernelName: ''
     DepthU: 64
@@ -34779,7 +34779,7 @@
     LdsOffsetB_Blk: 47104
     LdsPadA: 0
     LdsPadB: 16
-    LocalReadVectorWidth: 8
+    LocalReadVectorWidth: 4
     LocalSplitU: 1
     LocalWritePerMfma: -1
     LocalWriteUseSgprA: false
@@ -35203,7 +35203,7 @@
     LVPA: 4
     LVPB: 4
     LdsBlockSizePerPad: 128
-    LdsBlockSizePerPadA: 0
+    LdsBlockSizePerPadA: 1024
     LdsBlockSizePerPadB: 128
     LdsInitCVgprs: false
     LdsNumElements: 23296
@@ -35213,7 +35213,7 @@
     LdsOffsetA_Blk: 32768
     LdsOffsetB: 4096
     LdsOffsetB_Blk: 36864
-    LdsPadA: 0
+    LdsPadA: 16
     LdsPadB: 16
     LocalReadVectorWidth: 8
     LocalSplitU: 1
@@ -35421,7 +35421,7 @@
     LVPA: 2
     LVPB: 4
     LdsBlockSizePerPad: 128
-    LdsBlockSizePerPadA: 0
+    LdsBlockSizePerPadA: 2048
     LdsBlockSizePerPadB: 128
     LdsInitCVgprs: false
     LdsNumElements: 27392
@@ -35431,7 +35431,7 @@
     LdsOffsetA_Blk: 32768
     LdsOffsetB: 8192
     LdsOffsetB_Blk: 40960
-    LdsPadA: 0
+    LdsPadA: 16
     LdsPadB: 16
     LocalReadVectorWidth: 8
     LocalSplitU: 1
@@ -35639,7 +35639,7 @@
     LVPA: 4
     LVPB: 4
     LdsBlockSizePerPad: 128
-    LdsBlockSizePerPadA: 0
+    LdsBlockSizePerPadA: 3072
     LdsBlockSizePerPadB: 128
     LdsInitCVgprs: false
     LdsNumElements: 31488
@@ -35649,7 +35649,7 @@
     LdsOffsetA_Blk: 32768
     LdsOffsetB: 12288
     LdsOffsetB_Blk: 45056
-    LdsPadA: 0
+    LdsPadA: 16
     LdsPadB: 16
     LocalReadVectorWidth: 8
     LocalSplitU: 1
@@ -35857,7 +35857,7 @@
     LVPA: 16
     LVPB: 4
     LdsBlockSizePerPad: 128
-    LdsBlockSizePerPadA: 0
+    LdsBlockSizePerPadA: 256
     LdsBlockSizePerPadB: 128
     LdsInitCVgprs: false
     LdsNumElements: 21504
@@ -35867,7 +35867,7 @@
     LdsOffsetA_Blk: 32768
     LdsOffsetB: 1024
     LdsOffsetB_Blk: 33792
-    LdsPadA: 0
+    LdsPadA: 16
     LdsPadB: 16
     LocalReadVectorWidth: 8
     LocalSplitU: 1
@@ -36075,7 +36075,7 @@
     LVPA: 16
     LVPB: 4
     LdsBlockSizePerPad: 128
-    LdsBlockSizePerPadA: 0
+    LdsBlockSizePerPadA: 768
     LdsBlockSizePerPadB: 128
     LdsInitCVgprs: false
     LdsNumElements: 23552
@@ -36085,7 +36085,7 @@
     LdsOffsetA_Blk: 32768
     LdsOffsetB: 3072
     LdsOffsetB_Blk: 35840
-    LdsPadA: 0
+    LdsPadA: 16
     LdsPadB: 16
     LocalReadVectorWidth: 8
     LocalSplitU: 1
@@ -36511,7 +36511,7 @@
     LVPA: 16
     LVPB: 4
     LdsBlockSizePerPad: 128
-    LdsBlockSizePerPadA: 0
+    LdsBlockSizePerPadA: 1280
     LdsBlockSizePerPadB: 128
     LdsInitCVgprs: false
     LdsNumElements: 25600
@@ -36521,7 +36521,7 @@
     LdsOffsetA_Blk: 32768
     LdsOffsetB: 5120
     LdsOffsetB_Blk: 37888
-    LdsPadA: 0
+    LdsPadA: 16
     LdsPadB: 16
     LocalReadVectorWidth: 8
     LocalSplitU: 1
@@ -36947,7 +36947,7 @@
     LVPA: 16
     LVPB: 4
     LdsBlockSizePerPad: 128
-    LdsBlockSizePerPadA: 0
+    LdsBlockSizePerPadA: 1792
     LdsBlockSizePerPadB: 128
     LdsInitCVgprs: false
     LdsNumElements: 27648
@@ -36957,7 +36957,7 @@
     LdsOffsetA_Blk: 32768
     LdsOffsetB: 7168
     LdsOffsetB_Blk: 39936
-    LdsPadA: 0
+    LdsPadA: 16
     LdsPadB: 16
     LocalReadVectorWidth: 8
     LocalSplitU: 1
@@ -37348,7 +37348,7 @@
     AssignedProblemIndependentDerivedParameters: true
     BufferLoad: true
     BufferStore: true
-    ClusterLocalRead: 1
+    ClusterLocalRead: 0
     CodeObjectVersion: V3
     CustomKernelName: ''
     DepthU: 64
@@ -37395,7 +37395,7 @@
     LdsOffsetB_Blk: 41984
     LdsPadA: 0
     LdsPadB: 16
-    LocalReadVectorWidth: 8
+    LocalReadVectorWidth: 4
     LocalSplitU: 1
     LocalWritePerMfma: -1
     LocalWriteUseSgprA: false
@@ -37566,7 +37566,7 @@
     AssignedProblemIndependentDerivedParameters: true
     BufferLoad: true
     BufferStore: true
-    ClusterLocalRead: 1
+    ClusterLocalRead: 0
     CodeObjectVersion: V3
     CustomKernelName: ''
     DepthU: 64
@@ -37613,7 +37613,7 @@
     LdsOffsetB_Blk: 43008
     LdsPadA: 0
     LdsPadB: 8
-    LocalReadVectorWidth: 8
+    LocalReadVectorWidth: 4
     LocalSplitU: 1
     LocalWritePerMfma: -1
     LocalWriteUseSgprA: false
@@ -37784,7 +37784,7 @@
     AssignedProblemIndependentDerivedParameters: true
     BufferLoad: true
     BufferStore: true
-    ClusterLocalRead: 1
+    ClusterLocalRead: 0
     CodeObjectVersion: V3
     CustomKernelName: ''
     DepthU: 64
@@ -37831,7 +37831,7 @@
     LdsOffsetB_Blk: 44032
     LdsPadA: 0
     LdsPadB: 16
-    LocalReadVectorWidth: 8
+    LocalReadVectorWidth: 4
     LocalSplitU: 1
     LocalWritePerMfma: -1
     LocalWriteUseSgprA: false
@@ -38220,7 +38220,7 @@
     AssignedProblemIndependentDerivedParameters: true
     BufferLoad: true
     BufferStore: true
-    ClusterLocalRead: 1
+    ClusterLocalRead: 0
     CodeObjectVersion: V3
     CustomKernelName: ''
     DepthU: 64
@@ -38267,7 +38267,7 @@
     LdsOffsetB_Blk: 47104
     LdsPadA: 0
     LdsPadB: 8
-    LocalReadVectorWidth: 8
+    LocalReadVectorWidth: 4
     LocalSplitU: 1
     LocalWritePerMfma: -1
     LocalWriteUseSgprA: false
@@ -38474,7 +38474,7 @@
     LVPA: 4
     LVPB: 2
     LdsBlockSizePerPad: 128
-    LdsBlockSizePerPadA: 0
+    LdsBlockSizePerPadA: 512
     LdsBlockSizePerPadB: 128
     LdsInitCVgprs: false
     LdsNumElements: 7424
@@ -38485,7 +38485,7 @@
     LdsOffsetB: 2048
     LdsOffsetB_Blk: 6144
     LdsOffsetBias: 0
-    LdsPadA: 0
+    LdsPadA: 16
     LdsPadB: 16
     LocalReadVectorWidth: 8
     LocalSplitU: 1

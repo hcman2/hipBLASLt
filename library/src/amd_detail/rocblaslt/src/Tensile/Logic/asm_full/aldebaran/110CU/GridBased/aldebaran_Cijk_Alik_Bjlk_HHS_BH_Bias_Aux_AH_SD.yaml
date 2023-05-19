@@ -275,7 +275,7 @@
     VectorStore: -1
     VectorWidth: 2
     VectorWidthA: 2
-    VectorWidthB: 1
+    VectorWidthB: 4
     WaveSeparateGlobalReadA: 0
     WaveSeparateGlobalReadB: 1
     WavefrontSize: 64
@@ -501,7 +501,7 @@
     VectorStore: -1
     VectorWidth: 2
     VectorWidthA: 2
-    VectorWidthB: 1
+    VectorWidthB: 4
     WaveSeparateGlobalReadA: 0
     WaveSeparateGlobalReadB: 1
     WavefrontSize: 64
@@ -727,7 +727,7 @@
     VectorStore: -1
     VectorWidth: 2
     VectorWidthA: 2
-    VectorWidthB: 1
+    VectorWidthB: 4
     WaveSeparateGlobalReadA: 0
     WaveSeparateGlobalReadB: 1
     WavefrontSize: 64

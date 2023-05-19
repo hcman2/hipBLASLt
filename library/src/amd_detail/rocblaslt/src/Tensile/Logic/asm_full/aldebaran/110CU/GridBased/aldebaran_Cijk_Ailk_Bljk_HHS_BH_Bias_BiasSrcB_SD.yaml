@@ -111,7 +111,7 @@
     LVPB: 2
     LdsBlockSizePerPad: 0
     LdsBlockSizePerPadA: 0
-    LdsBlockSizePerPadB: 0
+    LdsBlockSizePerPadB: 128
     LdsInitCVgprs: false
     LdsNumElements: 32768
     LdsNumElementsAlignedA: 4096
@@ -122,7 +122,7 @@
     LdsOffsetB_Blk: 20480
     LdsOffsetBias: 0
     LdsPadA: 0
-    LdsPadB: 0
+    LdsPadB: 8
     LocalReadVectorWidth: 8
     LocalSplitU: 1
     LocalWritePerMfma: -1
@@ -336,7 +336,7 @@
     LVPB: 4
     LdsBlockSizePerPad: 0
     LdsBlockSizePerPadA: 0
-    LdsBlockSizePerPadB: 0
+    LdsBlockSizePerPadB: 128
     LdsInitCVgprs: false
     LdsNumElements: 32768
     LdsNumElementsAlignedA: 2048
@@ -347,7 +347,7 @@
     LdsOffsetB_Blk: 10240
     LdsOffsetBias: 0
     LdsPadA: 0
-    LdsPadB: 0
+    LdsPadB: 8
     LocalReadVectorWidth: 8
     LocalSplitU: 1
     LocalWritePerMfma: -1
@@ -561,7 +561,7 @@
     LVPB: 2
     LdsBlockSizePerPad: 0
     LdsBlockSizePerPadA: 0
-    LdsBlockSizePerPadB: 0
+    LdsBlockSizePerPadB: 128
     LdsInitCVgprs: false
     LdsNumElements: 32768
     LdsNumElementsAlignedA: 4096
@@ -572,7 +572,7 @@
     LdsOffsetB_Blk: 20480
     LdsOffsetBias: 0
     LdsPadA: 0
-    LdsPadB: 0
+    LdsPadB: 8
     LocalReadVectorWidth: 8
     LocalSplitU: 1
     LocalWritePerMfma: -1
