@@ -58,7 +58,7 @@ class NotLocalFullTileElementsMFMA(NotLocalFullTileElements):
 
         totalTT0     = totalTT0                      if kernel["SourceSwap"] else (totalTT0 * outputsPerThread)
         totalTT1     = (totalTT1 * outputsPerThread) if kernel["SourceSwap"] else totalTT1
-        vectorWidth0 = kernel["VectorWidthA"]         if kernel["SourceSwap"] else kernel["MIOutputVectorWidth"]
+        vectorWidth0 = kernel["VectorWidthA"]        if kernel["SourceSwap"] else kernel["VectorWidthA"] * kernel["MIOutputVectorWidth"]
         vectorWidth1 = kernel["VectorWidthB"] * kernel["MIOutputVectorWidth"] if kernel["SourceSwap"] else kernel["VectorWidthB"]
 
         for tt1 in range(0, ceil(totalTT1//vectorWidth1)):

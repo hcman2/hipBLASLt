@@ -1992,17 +1992,11 @@ class Solution(collections.abc.Mapping):
 
     # TT0,1 both must be multiples of VW, b/c of rC, rA, rB
     if state["EnableMatrixInstruction"]:
-      if state["SourceSwap"] and ((state["MIWaveTile"][0] % state["VectorWidthA"]) != 0):
+      if (state["MIWaveTile"][0] % state["VectorWidthA"]) != 0:
         reject(state, "MIWaveTile0(%u) should be multiple of VectorWidth(%u)" % (state["MIWaveTile"][0], state["VectorWidthA"]))
         return
-      if state["SourceSwap"] and ((state["MIWaveTile"][1] % state["VectorWidthB"]) != 0):
+      if (state["MIWaveTile"][1] % state["VectorWidthB"]) != 0:
         reject(state, "MIWaveTile0(%u) should be multiple of VectorWidth(%u)" % (state["MIWaveTile"][0], state["VectorWidthB"]))
-        return
-    else:
-      if state["ThreadTile0"] % state["VectorWidthA"] != 0 \
-          or state["ThreadTile1"] % state["VectorWidthB"] != 0:
-        reject(state, "ThreadTile0 %u not a multiple of VectorWidthA %u or ThreadTile1 %u not a multiple of VectorWidthB %u" \
-            % (state["ThreadTile0"], state["VectorWidthA"],state["ThreadTile1"], state["VectorWidthB"]))
         return
 
     if len(problemType["IndicesSummation"]) > 1:
@@ -2065,14 +2059,7 @@ class Solution(collections.abc.Mapping):
 
     # Default GlobalStoreVectorWidth
     if state["StoreVectorWidth"] == -1:
-      #TODO : re-enable later after running testlists
-      # use wider store for best store optimization
-      if state["SourceSwap"]:
-        state["StoreVectorWidth"] = state["VectorWidthA"]
-      elif state["ProblemType"]["DataType"].numRegisters() <= 1:
-        state["StoreVectorWidth"] = 4
-      else:
-        state["StoreVectorWidth"] = 4//state["ProblemType"]["DataType"].numRegisters()
+      state["StoreVectorWidth"] = state["VectorWidthA"]
 
     if state["EnableMatrixInstruction"]:
       if state["SourceSwap"]:
@@ -2080,8 +2067,8 @@ class Solution(collections.abc.Mapping):
           reject(state, "MFMA SourceSwap mode doesn't support vwA(%u) with svw(%u)" % (state["VectorWidthA"], state["StoreVectorWidth"]))
           return
       else:
-        if ((state["MIOutputVectorWidth"] % state["StoreVectorWidth"]) != 0):
-          reject(state, "MFMA non-SourceSwap mode doesn't support miovw(%u) with svw(%u)" % (state["MIOutputVectorWidth"], state["StoreVectorWidth"]))
+        if (((state["VectorWidthA"] * state["MIOutputVectorWidth"]) % state["StoreVectorWidth"]) != 0):
+          reject(state, "MFMA non-SourceSwap mode doesn't support miovw(%u) with svw(%u)" % (state["VectorWidthA"]*state["MIOutputVectorWidth"], state["StoreVectorWidth"]))
           return
 
     # reject - VW too big

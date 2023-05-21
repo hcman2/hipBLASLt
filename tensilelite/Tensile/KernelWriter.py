@@ -2346,12 +2346,12 @@ class KernelWriter(metaclass=abc.ABCMeta):
     vwa = kernel["GlobalReadVectorWidthA"]
     vwb = kernel["GlobalReadVectorWidthB"]
 
-    if kernel["SourceSwap"] and not kernel["UnrollMajorLDSA"]:
+    if not kernel["UnrollMajorLDSA"]:
       self.states.lrvwTileA = kernel["VectorWidthA"]
     else:
       self.states.lrvwTileA = 1
 
-    if kernel["SourceSwap"] and not kernel["UnrollMajorLDSB"]:
+    if not kernel["UnrollMajorLDSB"]:
       self.states.lrvwTileB = kernel["VectorWidthB"]
     else:
       self.states.lrvwTileB = 1

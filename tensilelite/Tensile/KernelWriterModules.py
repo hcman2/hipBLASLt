@@ -130,9 +130,9 @@ def _getAccToArchInfo(kernel):
   matrixInstBN = 1                                                if (kernel["MatrixInstN"] == 4) else kernel["MatrixInstBN"]
 
   OutputsPerMFMA1B = matrixInstM * matrixInstN // kernel["WavefrontSize"]
-  VectorWidth0     = kernel["VectorWidthA"] if kernel["SourceSwap"] else 1
+  VectorWidth0     = kernel["VectorWidthA"]
   outerTT0         = kernel["MIWaveTile"][0] // VectorWidth0
-  VectorWidth1     = kernel["VectorWidthB"] if kernel["SourceSwap"] else 1
+  VectorWidth1     = kernel["VectorWidthB"]
   outerTT1         = kernel["MIWaveTile"][1] // VectorWidth1
   return matrixInstBM, matrixInstBN, OutputsPerMFMA1B, VectorWidth0, VectorWidth1, outerTT0, outerTT1
 
@@ -165,8 +165,8 @@ def accToArchMapper(kernel):
                   src = tIdx + OutputsPerMFMA1B * (bIdx0 + matrixInstBM * (bIdx1 + matrixInstBN * (vw0 + VectorWidth0 * (wgIdx0 + outerTT0 * (vw1 + VectorWidth1 * (wgIdx1))))))
                   dst = vw0 + VectorWidth0 * (bIdx0 + matrixInstBM * (wgIdx0 + outerTT0 * (vw1 + VectorWidth1 * (tIdx + OutputsPerMFMA1B * (bIdx1 + matrixInstBN * (wgIdx1))))))
                 else:
-                  src = tIdx + OutputsPerMFMA1B * (bIdx1 + matrixInstBN * (bIdx0 + matrixInstBM * (wgIdx0 + outerTT0 * wgIdx1)))
-                  dst = tIdx + OutputsPerMFMA1B * (bIdx0 + matrixInstBM * (wgIdx0 + outerTT0 * (bIdx1 + matrixInstBN * wgIdx1)))
+                  src = tIdx + OutputsPerMFMA1B * (bIdx1 + matrixInstBN * (bIdx0 + matrixInstBM * (vw0 + VectorWidth0 * (wgIdx0 + outerTT0 * (vw1 + VectorWidth1 * (wgIdx1))))))
+                  dst = vw0 + VectorWidth0 * (tIdx + OutputsPerMFMA1B * (bIdx0 + matrixInstBM * (wgIdx0 + outerTT0 * (vw1 + VectorWidth1 * (bIdx1 + matrixInstBN * (wgIdx1))))))
                 acc2arch[src] = dst
                 arch2acc[dst] = src
   return acc2arch, arch2acc

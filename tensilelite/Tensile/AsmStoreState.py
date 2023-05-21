@@ -323,17 +323,17 @@ class StoreState:
                 remain_d1 = remain_d1 // matrixInstBN
                 wtIdex    = remain_d1 % kernel["MIWaveTile"][1]
 
-                coordOffset1  = eIdx1 * vectorWidth * (self.kernel["WavefrontSize"] // matrixInstN) * MFMAContinuousOutputs
-                coordOffset1 += bIdx1 * vectorWidth * matrixInstN
-                coordOffset1 += wtIdex * vectorWidth * matrixInstN *  matrixInstBN * kernel["MIWaveGroup"][1]
-                coordOffset1 = coordOffset1 + vc1
+                coordOffset1  = eIdx1 * (self.kernel["WavefrontSize"] // matrixInstN) * MFMAContinuousOutputs
+                coordOffset1 += bIdx1 * matrixInstN
+                coordOffset1 += wtIdex * matrixInstN *  matrixInstBN * kernel["MIWaveGroup"][1]
+                coordOffset1  = coordOffset1 * vectorWidth + vc1
 
             newCoord1 = (self.firstBatch and elementIdx==0) or (coordOffset1 != self.lastCoordOffset1)
 
             # gpr and offset assignments for element
             coordOffset0 = 0
             if kernel["EnableMatrixInstruction"]:
-                vectorWidth = kernel["VectorWidthA"] if kernel["SourceSwap"] else 1 # TODO: nonSwap VectorWidth
+                vectorWidth = kernel["VectorWidthA"]
                 MFMAContinuousOutputs = 1 if kernel["SourceSwap"] else kernel["MIOutputVectorWidth"]
                 OutputsPerMIMN        = 1 if kernel["SourceSwap"] else matrixInstM * matrixInstN // self.kernel["WavefrontSize"]
 
@@ -344,10 +344,10 @@ class StoreState:
                 remain_d0    = remain_d0 // matrixInstBM
                 wtIdex       = remain_d0 % kernel["MIWaveTile"][0]
 
-                coordOffset0  = eIdx0  * vectorWidth * (self.kernel["WavefrontSize"] // matrixInstM) * MFMAContinuousOutputs
-                coordOffset0 += bIdx0  * vectorWidth * matrixInstM
-                coordOffset0 += wtIdex * vectorWidth * matrixInstM * matrixInstBM * kernel["MIWaveGroup"][0]
-                coordOffset0 += vc0
+                coordOffset0  = eIdx0 * (self.kernel["WavefrontSize"] // matrixInstM) * MFMAContinuousOutputs
+                coordOffset0 += bIdx0 * matrixInstM
+                coordOffset0 += wtIdex * matrixInstM * matrixInstBM * kernel["MIWaveGroup"][0]
+                coordOffset0  = coordOffset0 * vectorWidth + vc0
 
             if self.optSingleColVgpr:
                 # use same address vgpr for all

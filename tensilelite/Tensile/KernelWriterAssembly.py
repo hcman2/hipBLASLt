@@ -5505,15 +5505,13 @@ class KernelWriterAssembly(KernelWriter):
   # computeStoreVgprs
   # Compute workitem/TT offsets in VGPRS
   # and coord0/coord1
-  # tid0Scale specifies the number of output elements in 0/coalesced dim
-  # that should be written by each work-item in each batch element.
   ##############################################################################
-  def computeStoreVgprs(self, kernel, divisor, tid0Scale, tid1Scale):
+  def computeStoreVgprs(self, kernel):
     module = Module("computeStoreVgprs")
     module.addComment0("computeStoreVgprs")
     component = Component.ComputeStoreVgprs.find(self)
     if component:
-      module.add(component(self, kernel, divisor, tid0Scale, tid1Scale)) #FIXME
+      module.add(component(self, kernel)) #FIXME
     return module
 
   ##############################################################################
@@ -5538,10 +5536,7 @@ class KernelWriterAssembly(KernelWriter):
     module = Module("localSplitUGlobalWriteIndices")
 
     # lr0 = serial % SG0
-    module.add(self.computeStoreVgprs(kernel, \
-              divisor = kernel["MacroTile0"] // kernel["GlobalWriteVectorWidth"], \
-              tid0Scale=kernel["GlobalWriteVectorWidth"], \
-              tid1Scale=1))
+    module.add(self.computeStoreVgprs(kernel))
 
     if kernel["BufferStore"]:
       #print "----AddressC-LocalSplitU"
@@ -5622,10 +5617,7 @@ class KernelWriterAssembly(KernelWriter):
     if not self.do["PostLoop"]: return ""
     module = Module("notLocalSplitUGlobalWriteIndices")
 
-    module.add(self.computeStoreVgprs(kernel,
-              divisor = kernel["SubGroup0"],\
-              tid0Scale=kernel["VectorWidthA"], \
-              tid1Scale=kernel["VectorWidthB"]))
+    module.add(self.computeStoreVgprs(kernel))
 
     if kernel["BufferStore"]:
       #print "----AddressC-nonLSU-----"
