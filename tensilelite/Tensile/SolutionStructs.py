@@ -1964,19 +1964,16 @@ class Solution(collections.abc.Mapping):
     if state["EnableMatrixInstruction"]:
       if state["VectorWidthA"] == -1:
         regPerElem = state["ProblemType"]["DataType"].numRegisters()
-        if state["SourceSwap"]:
-          optVW = int(4 // regPerElem)
-          while 1:
-            if state["MIWaveTile"][0] % optVW == 0:
-              state["VectorWidthA"] = optVW
-              break
-            else:
-              optVW //= 2
-        else:
-          state["VectorWidthA"] = 1
+        optVW = int(4 // regPerElem)
+        while 1:
+          if state["MIWaveTile"][0] % optVW == 0:
+            state["VectorWidthA"] = optVW
+            break
+          else:
+            optVW //= 2
       if state["VectorWidthB"] == -1:
         regPerElem = state["ProblemType"]["DataType"].numRegisters()
-        if state["SourceSwap"] and not state["UnrollMajorLDSB"]:
+        if not state["UnrollMajorLDSB"]:
           optVW = int(4 // regPerElem)
           while 1:
             if state["MIWaveTile"][1] % optVW == 0:
@@ -1987,8 +1984,8 @@ class Solution(collections.abc.Mapping):
         else:
           state["VectorWidthB"] = 1
 
-    if state["EnableMatrixInstruction"] and not state["SourceSwap"] and (state["VectorWidthA"] > 1 or state["VectorWidthB"] > 1):
-      reject(state, "not implement VectorWidth without SourceSwap")
+    # if state["EnableMatrixInstruction"] and not state["SourceSwap"] and (state["VectorWidthA"] > 1 or state["VectorWidthB"] > 1):
+    #   reject(state, "not implement VectorWidth without SourceSwap")
 
     # TT0,1 both must be multiples of VW, b/c of rC, rA, rB
     if state["EnableMatrixInstruction"]:
@@ -2059,7 +2056,12 @@ class Solution(collections.abc.Mapping):
 
     # Default GlobalStoreVectorWidth
     if state["StoreVectorWidth"] == -1:
-      state["StoreVectorWidth"] = state["VectorWidthA"]
+      if state["SourceSwap"]:
+        state["StoreVectorWidth"] = state["VectorWidthA"]
+      else:
+        state["StoreVectorWidth"] = state["MIOutputVectorWidth"]
+        if state["VectorWidthA"] * state["MIOutputVectorWidth"] <= 4/state["ProblemType"]["DestDataType"].numRegisters():
+          state["StoreVectorWidth"] = state["VectorWidthA"] * state["MIOutputVectorWidth"]
 
     if state["EnableMatrixInstruction"]:
       if state["SourceSwap"]:
@@ -2575,11 +2577,11 @@ class Solution(collections.abc.Mapping):
       state["GuaranteeNoPartialB"] = True
 
     # SourceSwap
-    if state["SourceSwap"]:
-      if not state["EnableMatrixInstruction"]:
-        reject(state, "SourceSwap only applies to MatrixInstruction kernels")
+    if state["StoreRemapVectorWidth"]:
+      if state["SourceSwap"]:
+        reject(state, "SourceSwap not compatible with StoreRemap")
         return
-      if state["StoreRemapVectorWidth"]:
+      if state["VectorWidthA"] > 1 or state["VectorWidthB"] > 1:
         reject(state, "SourceSwap not compatible with StoreRemap")
         return
 
