@@ -361,8 +361,6 @@ namespace Tensile
         if(isB2BGemm)
         {
             TensorDescriptor const& b = problem.b();
-            uint64_t tensor2dSizeB = b.totalAllocatedElements();
-            args.append<uint64_t>("tensor2dSizeB1", tensor2dSizeB);
             size_t startStrideAB = problemType.useInitialStridesAB ? 0 : 1;
             for(size_t i = startStrideAB; i < b.dimensions(); i++)
                 args.append<uint32_t>(concatenate_if<T_Debug>("strideB1", i), b.strides()[i]);

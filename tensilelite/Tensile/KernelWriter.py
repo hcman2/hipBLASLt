@@ -665,8 +665,8 @@ class KernelWriter(metaclass=abc.ABCMeta):
           iterCode.add(SSetPrior(prior=3, comment="Raise priority while processing macs"))
         item = macIterItems.pop(0)
         iterCode.add(item)
-      while macIterItems:
-        iterCode.add(macIterItems.pop(0))
+      while macIterItem:
+        iterCode.add(macIterItem.pop(0))
 
       iterCode.add(SSetPrior(prior=1, comment="Raise priority while processing macs"))
       if kernel["1LDSBuffer"]:
