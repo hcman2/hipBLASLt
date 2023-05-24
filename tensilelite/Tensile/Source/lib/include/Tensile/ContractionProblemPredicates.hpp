@@ -1401,6 +1401,38 @@ namespace Tensile
                 }
             };
 
+            struct B2BGemmEqual
+                : public Predicate_CRTP<B2BGemmEqual, ContractionProblemGemm>
+            {
+                enum
+                {
+                    HasIndex = false,
+                    HasValue = true
+                };
+                bool value;
+
+                B2BGemmEqual() = default;
+                B2BGemmEqual(bool value)
+                    : value(value)
+                {
+                }
+
+                static std::string Type()
+                {
+                    return "B2BGemm";
+                }
+
+                virtual bool operator()(ContractionProblemGemm const& problem) const override
+                {
+                    auto sizes = problem.problemSizes();
+                    if (sizes[1] != 256 && sizes[1] != 128 && sizes[1] != 64)
+                    {
+                        return false;
+                    }
+                    return problem.b2bGemm() == value;
+                }
+            };
+
             struct CUEfficiency : public Predicate_CRTP<CUEfficiency, ContractionProblemGemm>
             {
                 enum

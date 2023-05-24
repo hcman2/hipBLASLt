@@ -301,7 +301,10 @@ namespace Tensile
 
                     //2nd Gemm
                     aStrides[1] = N;
-                    bStrides[1] = N;
+                    if(m_tensorStrides[ContractionProblemGemm::TENSOR::B].size() == 2)
+                        bStrides[1] = m_tensorStrides[ContractionProblemGemm::TENSOR::B][1][1];
+                    else
+                        bStrides[1] = N;
                     rv.push_back(ContractionProblemGemm::FromIndexSizes(
                         m_freeIndices,
                         m_batchIndices,
