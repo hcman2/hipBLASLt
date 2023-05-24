@@ -231,7 +231,8 @@ namespace Tensile
                 dStrides = m_tensorStrides[ContractionProblemGemm::TENSOR::D][0];
             if(m_tensorStrides[ContractionProblemGemm::TENSOR::E].size() == 1)
                 eStrides = m_tensorStrides[ContractionProblemGemm::TENSOR::E][0];
-if(m_b2bGemm)
+
+            if(m_b2bGemm)
             {
                 for(int k = 0; k < biasSize; k++)
                 {                 
@@ -294,7 +295,10 @@ if(m_b2bGemm)
 
                     //2nd Gemm
                     aStrides[1] = N;
-                    bStrides[1] = N;
+                    if(m_tensorStrides[ContractionProblemGemm::TENSOR::B].size() == 2)
+                        bStrides[1] = m_tensorStrides[ContractionProblemGemm::TENSOR::B][1][1];
+                    else
+                        bStrides[1] = N;
                     rv.push_back(ContractionProblemGemm::FromIndexSizes(
                         m_freeIndices,
                         m_batchIndices,
