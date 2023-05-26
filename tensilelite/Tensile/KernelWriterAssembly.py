@@ -7829,21 +7829,21 @@ class KernelWriterAssembly(KernelWriter):
       dst = vgpr(biasVgpr)
       src = vgpr(addrCalc.addrBiasVgpr)
       ds = DSModifiers(offset=addrCalc.biasOffset)
-      bps = dataType.numBytes() * ss.cfg.gwvw
-      if bps==2:
+      bpl = dataType.numBytes() * ss.cfg.gwvw
+      if bpl==2:
         module.add(DSLoadU16(dst=dst, src=src, ds=ds, comment="load bias"))
-      elif bps==4:
+      elif bpl==4:
         module.add(DSLoadB32(dst=dst, src=src, ds=ds, comment="load bias"))
-      elif bps==8:
+      elif bpl==8:
         module.add(DSLoadB64(dst=vgpr(biasVgpr, 2), src=src, ds=ds, comment="load bias"))
-      elif bps==16:
+      elif bpl==16:
         module.add(DSLoadB128(dst=vgpr(biasVgpr, 4), src=src, ds=ds, comment="load bias"))
-      elif bps==32:
+      elif bpl==32:
         module.add(DSLoadB128(dst=vgpr(biasVgpr, 4), src=src, ds=ds, comment="load bias"))
-        ds = DSModifiers(offset=addrCalc.biasOffset+bps/2)
+        ds = DSModifiers(offset=addrCalc.biasOffset+bpl/2)
         module.add(DSLoadB128(dst=vgpr(biasVgpr+4, 4), src=src, ds=ds, comment="load bias"))
       else:
-        print("Henry 3", ss.cfg.gwvw, dataType.numBytes())
+        assert 0, "bad bpl"
       return module
 
     if self.states.useBias == DataDirection.READ:
