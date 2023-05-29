@@ -260,16 +260,12 @@ namespace Tensile
                         m_problemSizes[0],
                         m_tensorTypes[ContractionProblemGemm::TENSOR::A],
                         aStrides,
-                        m_tensorOffsets[ContractionProblemGemm::TENSOR::A],
                         m_tensorTypes[ContractionProblemGemm::TENSOR::B],
                         bStrides,
-                        m_tensorOffsets[ContractionProblemGemm::TENSOR::B],
                         m_tensorTypes[ContractionProblemGemm::TENSOR::C],
                         cStrides,
-                        0,
                         m_tensorTypes[ContractionProblemGemm::TENSOR::D],
                         dStrides,
-                        0,
                         m_constantValues[ContractionProblemGemm::CONST::BETA]));
 
                     rv.back().setAlphaRestriction(toScalarValueEnum(
@@ -312,16 +308,12 @@ namespace Tensile
                         m_problemSizes[1],
                         m_tensorTypes[ContractionProblemGemm::TENSOR::A],
                         aStrides,
-                        0,
                         m_tensorTypes[ContractionProblemGemm::TENSOR::B],
                         bStrides,
-                        0,
                         m_tensorTypes[ContractionProblemGemm::TENSOR::C],
                         cStrides,
-                        m_tensorOffsets[ContractionProblemGemm::TENSOR::C],
                         m_tensorTypes[ContractionProblemGemm::TENSOR::D],
                         dStrides,
-                        m_tensorOffsets[ContractionProblemGemm::TENSOR::D],
                         m_constantValues[ContractionProblemGemm::CONST::BETA]));
                     rv.back().setAlphaRestriction(toScalarValueEnum(
                         m_constantValues[ContractionProblemGemm::CONST::ALPHA]));
