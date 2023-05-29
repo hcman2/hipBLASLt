@@ -245,13 +245,6 @@ class GlobalWriteBatchWriter:
     self.scaleDLoadIssued = []
     loadedDataBias = {}
     loadedDataScaleD = {}
-
-    if self.kernel["BufferStore"] and self.edge:
-      bufferOOB = self.parentWriter.vgprPool.checkOut(1, "BufferOOB")
-      module.add(VMovB32(dst=vgpr(bufferOOB), src="BufferOOB"))
-    else:
-      bufferOOB = None
-
     for elementIdx, element in enumerate(self.batchElements):
       addrCalc: AddrCalculation = self.ss.elementAddr[elementIdx]
       addrCVgpr    = addrCalc.addrCVgpr
@@ -273,24 +266,24 @@ class GlobalWriteBatchWriter:
 
       # create code Module to push mov vgpr,acc instructions
       if self.beta:
-        module.add(addrCalc.emitLdChange(self.kernel, self.ss, 'C', self.edge, self.beta, mask, bufferOOB, (elementIdx == 0), self.tmpVgpr, self.tmpSgpr, addrCVgpr, self.addrC))
+        module.add(addrCalc.emitLdChange(self.kernel, self.ss, 'C', self.edge, self.beta, mask, (elementIdx == 0), self.tmpVgpr, self.tmpSgpr, addrCVgpr, self.addrC))
         if self.kernel["GroupLoadStore"]:
           loadInputCode.add(self.parentWriter.readInput(self.kernel, self.ss, 'C', self.kernel["ProblemType"]["DestDataType"], addrCalc, vc0, data, self.gwvw, addrCVgpr, self.tmpS01))
         else:
           module.add(self.parentWriter.readInput(self.kernel, self.ss, 'C', self.kernel["ProblemType"]["DestDataType"], addrCalc, vc0, data, self.gwvw, addrCVgpr, self.tmpS01))
-        self.loadsIssued += ceil(self.kernel["ProblemType"]["ComputeDataType"].numBytes() * self.gwvw / 16)
+        self.loadsIssued += 1
       if (self.kernel["ProblemType"]["UseE"] and self.kernel["ProblemType"]["Gradient"] and self.kernel["ProblemType"]["ActivationType"] != 'none') and (self.kernel["GlobalSplitU"] == 1):
-        module.add(addrCalc.emitLdChange(self.kernel, self.ss, 'E', self.edge, self.beta, mask, bufferOOB, (elementIdx == 0), self.tmpVgpr, self.tmpSgpr, addrEVgpr, self.addrE))
+        module.add(addrCalc.emitLdChange(self.kernel, self.ss, 'E', self.edge, self.beta, mask, (elementIdx == 0), self.tmpVgpr, self.tmpSgpr, addrEVgpr, self.addrE))
         if self.kernel["GroupLoadStore"]:
           loadInputCode.add(self.parentWriter.readInput(self.kernel, self.ss, 'E', self.kernel["ProblemType"]["ComputeDataType"], addrCalc, vc0, dataE, self.gwvw, addrEVgpr, self.tmpS01))
         else:
           module.add(self.parentWriter.readInput(self.kernel, self.ss, 'E', self.kernel["ProblemType"]["ComputeDataType"], addrCalc, vc0, dataE, self.gwvw, addrEVgpr, self.tmpS01))
-        self.loadsIssued += ceil(self.kernel["ProblemType"]["ComputeDataType"].numBytes() * self.gwvw / 16)
+        self.loadsIssued += 1
         self.loadE = True
       else:
         self.loadE = False
       if self.parentWriter.states.useBias == DataDirection.READ:
-        module.add(addrCalc.emitLdChange(self.kernel, self.ss, 'Bias', self.edge, self.beta, mask, bufferOOB, (elementIdx == 0), self.tmpVgpr, self.tmpSgpr, addrBiasVgpr, self.addrBias))
+        module.add(addrCalc.emitLdChange(self.kernel, self.ss, 'Bias', self.edge, self.beta, mask, (elementIdx == 0), self.tmpVgpr, self.tmpSgpr, addrBiasVgpr, self.addrBias))
         if dataBias not in loadedDataBias:
           if self.kernel["GroupLoadStore"]:
             # Group bias load with C input to
@@ -305,12 +298,12 @@ class GlobalWriteBatchWriter:
               module.add(SBarrier("Bias LDS write barrier"))
               self.biasLocalBarrierInit = True
             module.add(self.parentWriter.addBiasLoad(self.kernel["ProblemType"]["ComputeDataType"], self.kernel, self.ss, addrCalc, dataBias, True))
-          loadedDataBias[dataBias] = ceil(self.kernel["ProblemType"]["ComputeDataType"].numBytes() * self.ss.cfg.gwvw / 16)
-          self.localLoadIssued += ceil(self.kernel["ProblemType"]["ComputeDataType"].numBytes() * self.ss.cfg.gwvw / 16)
-      self.biasLoadIssued.append(len(loadedDataBias) * ceil(self.kernel["ProblemType"]["ComputeDataType"].numBytes() * self.ss.cfg.gwvw / 16))
+          loadedDataBias[dataBias] = 1
+          self.localLoadIssued += 1
+      self.biasLoadIssued.append(len(loadedDataBias))
 
       if self.kernel["ProblemType"]["UseScaleD"] and (self.kernel["GlobalSplitU"] == 1):
-        module.add(addrCalc.emitLdChange(self.kernel, self.ss, 'ScaleD', self.edge, self.beta, mask, bufferOOB, (elementIdx == 0), self.tmpVgpr, self.tmpSgpr, addrScaleDVgpr, self.addrScaleD))
+        module.add(addrCalc.emitLdChange(self.kernel, self.ss, 'ScaleD', self.edge, self.beta, mask, (elementIdx == 0), self.tmpVgpr, self.tmpSgpr, addrScaleDVgpr, self.addrScaleD))
         if dataScaleD not in loadedDataScaleD:
           # Shift right several vgprs for cvt ops if needed
           numVgprs = int(ceil(self.kernel["ProblemType"]["ComputeDataType"].numRegisters() * self.ss.cfg.gwvw))
@@ -321,15 +314,15 @@ class GlobalWriteBatchWriter:
             loadInputCode.add(self.parentWriter.addScaleDLoad(self.kernel, self.ss, addrCalc, gprShiftScaleD))
           else:
             module.add(self.parentWriter.addScaleDLoad(self.kernel, self.ss, addrCalc, gprShiftScaleD))
-          loadedDataScaleD[dataScaleD] = ceil(self.kernel["ProblemType"]["ComputeDataType"].numBytes() * self.ss.cfg.gwvw / 16)
-          self.loadsScaleDIssued += ceil(self.kernel["ProblemType"]["ComputeDataType"].numBytes() * self.ss.cfg.gwvw / 16)
-      self.scaleDLoadIssued.append(len(loadedDataScaleD) * ceil(self.kernel["ProblemType"]["ComputeDataType"].numBytes() * self.ss.cfg.gwvw / 16))
+          loadedDataScaleD[dataScaleD] = 1
+          self.loadsScaleDIssued += 1
+      self.scaleDLoadIssued.append(len(loadedDataScaleD))
 
       if (self.kernel["ProblemType"]["UseE"] and not self.kernel["ProblemType"]["Gradient"]) and (self.kernel["GlobalSplitU"] == 1):
-        module.add(addrCalc.emitLdChange(self.kernel, self.ss, 'E', self.edge, self.beta, mask, bufferOOB, (elementIdx == len(self.batchElements) - 1), self.tmpVgpr, self.tmpSgpr, addrEVgpr, self.addrE))
+        module.add(addrCalc.emitLdChange(self.kernel, self.ss, 'E', self.edge, self.beta, mask, (elementIdx == len(self.batchElements) - 1), self.tmpVgpr, self.tmpSgpr, addrEVgpr, self.addrE))
       if self.storeBiasD == 1:
-        module.add(addrCalc.emitLdChange(self.kernel, self.ss, 'Bias', self.edge, self.beta, mask, bufferOOB, (elementIdx == len(self.batchElements) - 1), self.tmpVgpr, self.tmpSgpr, addrBiasVgpr, self.addrBias))
-      module.add(addrCalc.emitLdChange(self.kernel, self.ss, 'D', self.edge, self.beta, mask, bufferOOB, (elementIdx == len(self.batchElements) - 1), self.tmpVgpr, self.tmpSgpr, addrDVgpr, self.addrD))
+        module.add(addrCalc.emitLdChange(self.kernel, self.ss, 'Bias', self.edge, self.beta, mask, (elementIdx == len(self.batchElements) - 1), self.tmpVgpr, self.tmpSgpr, addrBiasVgpr, self.addrBias))
+      module.add(addrCalc.emitLdChange(self.kernel, self.ss, 'D', self.edge, self.beta, mask, (elementIdx == len(self.batchElements) - 1), self.tmpVgpr, self.tmpSgpr, addrDVgpr, self.addrD))
 
       if self.atomic and (not self.parentWriter.states.useAtomicAdd):
         # load c into data+1 because of CAS structure
@@ -368,9 +361,6 @@ class GlobalWriteBatchWriter:
         # restore full exec mask for calculating addr of next element
         if self.edge and (self.beta or self.loadE or self.atomic):
           module.add(self.getEdgeMovInstType()(EXEC(), -1, "full mask -1 -> exec"))
-
-    if self.kernel["BufferStore"] and self.edge:
-      self.parentWriter.vgprPool.checkIn(bufferOOB)
 
     module.add(loadInputCode)
 
