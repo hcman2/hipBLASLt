@@ -618,7 +618,7 @@ namespace Tensile
 
         rv.sharedMemBytes = 0;
 
-        singleCallArgs<T_Debug>(problem, inputs, 0, rv.args);
+        singleCallArgs<T_Debug>(problem, inputs, 0, false, rv.args);
 
         if((sizeMapping.globalAccumulation == 2) && (sizeMapping.customKernelName != ""))
         {
@@ -735,7 +735,7 @@ template <typename KA>
             {
                 auto problem = problems[idx];
                 singleCallArgs<T_Debug>(
-                    problem, inputs.grouped[idx], workspaceOffsetInByte, h_args);
+                    problem, inputs.grouped[idx], workspaceOffsetInByte, false, h_args);
                 if constexpr(std::is_same<KA, KernelArguments>::value)
                     workspaceOffsetInByte += requiredWorkspaceSize(problem);
             }
@@ -828,12 +828,12 @@ template <typename KA>
                 rv.sharedMemBytes = 0;
 
                 singleCallArgs<T_Debug>(
-                    problem, inputs.grouped[0], problemNumGroupTiles0, problemNumGroupTiles1, false, false, rv.args);
+                    problem, inputs.grouped[0], 0, false, rv.args);
             }
             else if(idx == 1)
             {
                 singleCallArgs<T_Debug>(
-                    problem, inputs.grouped[1], problemNumGroupTiles0, problemNumGroupTiles1, false, true, rv.args);
+                    problem, inputs.grouped[1], 0, true, rv.args);
             }
             
         }
