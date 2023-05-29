@@ -557,7 +557,7 @@ namespace Tensile
         rv.sharedMemBytes = 0;
 
         singleCallArgs<T_Debug>(
-            problem, inputs, problemNumGroupTiles0, problemNumGroupTiles1, 0, false, rv.args);
+            problem, inputs, problemNumGroupTiles0, problemNumGroupTiles1, 0, false, false, rv.args);
 
         rv.codeObjectFile = codeObjectFilename.load();
 
@@ -660,6 +660,7 @@ namespace Tensile
                                     problemNumGroupTiles1[idx],
                                     workspaceOffsetInByte,
                                     true,
+                                    false,
                                     h_args);
             if constexpr(std::is_same<KA, KernelArguments>::value)
                 workspaceOffsetInByte += requiredWorkspaceSize(problem);
@@ -750,12 +751,12 @@ namespace Tensile
                 rv.sharedMemBytes = 0;
 
                 singleCallArgs<T_Debug>(
-                    problem, inputs.grouped[0], problemNumGroupTiles0, problemNumGroupTiles1, false, false, rv.args);
+                    problem, inputs.grouped[0], problemNumGroupTiles0, problemNumGroupTiles1, 0, false, false, rv.args);
             }
             else if(idx == 1)
             {
                 singleCallArgs<T_Debug>(
-                    problem, inputs.grouped[1], problemNumGroupTiles0, problemNumGroupTiles1, false, true, rv.args);
+                    problem, inputs.grouped[1], problemNumGroupTiles0, problemNumGroupTiles1, 0, false, true, rv.args);
             }
             
         }
