@@ -809,18 +809,6 @@ namespace Tensile
                     problem.gemms[idx], inputs.grouped[idx], elementsToValidate);
             }
         }
-		        template <typename Inputs, typename Accumulator>
-        void ReferenceSolution<Inputs, Accumulator>::SolveCPU(
-            ContractionProblemGroupedGemm const& problem,
-            ContractionGroupedInputs const&      inputs,
-            size_t                               elementsToValidate)
-        {
-            for(int idx = 0; idx < problem.gemms.size(); idx++)
-            {
-                ReferenceSolution<Inputs, Accumulator>::SolveCPU(
-                    problem.gemms[idx], inputs.grouped[idx], elementsToValidate);
-            }
-        }
 
         template <typename Inputs, typename Accumulator>
         void ReferenceSolution<Inputs, Accumulator>::SolveCPU(

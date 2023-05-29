@@ -1048,8 +1048,8 @@ class KernelWriterAssembly(KernelWriter):
       moduleArgs.addModuleAsFlatItems(lralwaCode)
       moduleArgs.add(SWaitCnt(lgkmcnt=0, comment="wait for %u bytes of kern args" % self.argLoader.getOffset()))
 
-      with self.allocTmpSgpr(3) as tmpSgprInfo:
-        moduleArgs.add(SLongBranchPositive(Label("b2bg_start",""),tmpSgprInfo,""))
+      #with self.allocTmpSgpr(3) as tmpSgprInfo:
+      #  moduleArgs.add(SLongBranchPositive(Label("b2bg_start",""),tmpSgprInfo,""))
 
       if not kernel["ProblemType"]["StridedBatched"]:
         with self.allocTmpSgpr(self.states.laneSGPRCount) as tmpSgpr:
@@ -8473,7 +8473,7 @@ class KernelWriterAssembly(KernelWriter):
       paramList = []
       paramList.append(int(offset_val))
       ds = DSModifiers(na=1, offset=paramList[0])
-      lrB1code.add(localReadX(dst=vgpr(lrB1Idx, numVgprRequiredPerVector), src=vgpr(lrB1Addr), readToTempVgpr=False, ds=ds, comment=""))
+      lrB1code.add(localReadX(dst=vgpr(lrB1Idx, numVgprRequiredPerVector), src=vgpr(lrB1Addr), ds=ds, comment=""))
 
     return lrB1code
 
@@ -8619,14 +8619,13 @@ class KernelWriterAssembly(KernelWriter):
                         % (tP["localReadOffset"], tP["localReadSwapByteOffset"], MIWaveGroupShape[tile01], vIdx, rIdx, oIdx, 0, 0)
 
                 highBits = highBitsForHalf or isHigh16Bits
-                readToTempVgpr = highBitsForHalf or isHigh8Bits or isHigh16Bits
 
                 if numOffsets == 1:
                     ds = DSModifiers(na=1, offset=paramList[0])
                 else:
                     ds = DSModifiers(na=2, offset0=paramList[0], offset1=paramList[1])
                 localReadX = instruction.getInst(highBits)
-                localReadCode.add(localReadX(dst=destVgpr, src=vgpr(srcVgprIdx), readToTempVgpr=readToTempVgpr, ds=ds, comment=comment))
+                localReadCode.add(localReadX(dst=destVgpr, src=vgpr(srcVgprIdx), ds=ds, comment=comment))
     return imod, pack
 
   def b2bgemmLocalReadA1(self, kernel, tP, rowVgprIdx, kIdx: int, vgprReadIncIdx: int, loadVgpr: int) -> Tuple[Module, Module, Module]:
@@ -9105,7 +9104,10 @@ class KernelWriterAssembly(KernelWriter):
       grItems += prefetchGRCode[i].flatitems()
 
     lenGRB1= len(grItems)
-    numInstPerGR = max(1, (lenLWA1+lenInitAcc) // lenGRB1)
+    if lenGRB1 > 0:
+      numInstPerGR = max(1, (lenLWA1+lenInitAcc) // lenGRB1)
+    else:
+      numInstPerGR = 1
     while lwItems:
       if grItems:
         item = grItems.pop(0)
@@ -9262,7 +9264,7 @@ class KernelWriterAssembly(KernelWriter):
     self.vgprPool.checkIn(lraAddrRowVgprIdx)
 
     module.add(self._syncThreads(kernel))
-    module.add(SEndpgm(comment="Remove me"))
+    #module.add(SEndpgm(comment="Remove me"))
     return module
 
 def _getEccOffset(totalWidth, bpr, bpe, glvw, idx, numVgprG2L):
