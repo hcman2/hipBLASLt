@@ -7873,68 +7873,83 @@ class KernelWriterAssembly(KernelWriter):
   def b2bgemmComputeStoreVgprs(self, kernel) -> Tuple[Module, int]:
     module = Module("b2bgemmComputeStoreVgprs")
     module.addComment0("b2bgemm Local Write address")
-    wtid = self.vgprPool.checkOut(1, "b2bgemm coord0")
-    wid = self.vgprPool.checkOut(1, "b2bgemm coord1")
-    b2bgemmLW = self.vgprPool.checkOut(1, "b2bgemm local write")
 
-    tmpV0 = self.vgprPool.checkOut(5, "tmpV0")
-    waveCoord0 = tmpV1 = tmpV0+1
-    ldsStride = tmpV0+2
-    coord0 = tmpV0+3
-    waveCoord1 = tmpV0+4
     ldsPad = kernel["b2bGemmLdsAPad"]
-    instM, instN = kernel["MatrixInstM"], kernel["MatrixInstN"]
-    BM, BN = kernel["MatrixInstBM"], kernel["MatrixInstBN"]
-    wavelen = kernel["WavefrontSize"]
     MT0, MT1 = kernel["MacroTile0"], kernel["MacroTile1"]
-    waveGroup0, waveGroup1 = kernel["MIWaveGroup"]
     ldsPadB1 = kernel["b2bGemmLdsBPad"]
     b2bg1LDS = kernel["b2bGemm1LDSBuffer"]
     ldsOffsetToA1 = (kernel["b2bGemmDepthU"] + ldsPadB1) * MT1
     if b2bg1LDS==0:
       ldsOffsetToA1 *= 2
 
-    #calculate local write Address: v[vgprLocalWriteAddrC]
-    module.add(vectorStaticDivideAndRemainder(wid, wtid, "Serial", wavelen * waveGroup0, \
-      RegisterPoolResource(tmpV0, 2)))
+    # alloc resources
+    tid0 = self.vgprPool.checkOut(1, "coord0")
+    tid1 = self.vgprPool.checkOut(1, "coord1")
 
-    module.add(VMulLOU32(dst=vgpr(waveCoord1),
-              src0=hex(instN * BN), src1=vgpr(wid), comment="coord1 offset of LDS for each Wave"))
-    module.add(VAndB32(dst=vgpr(wid),
-              src0=hex(instN - 1), src1=vgpr(wtid), comment="coord1 offset of LDS for each thread"))
-    module.add(VAddU32(dst=vgpr(wid), src0=vgpr(waveCoord1), src1=vgpr(wid), comment="coord1 offset in MacroTile"))
-    module.add(VMovB32(dst=vgpr(ldsStride), src=hex(MT0 + ldsPad), \
+    b2bgemmLW  = self.vgprPool.checkOut(1, "A1inRowPtr")
+
+    wave_id = self.vgprPool.checkOut(1, "tmpWaveID")
+
+    tmpVgpr0 = self.vgprPool.checkOut(1,"tmpVgpr0")
+    tmpVgpr1 = self.vgprPool.checkOutAligned(2,2,"tmpVgpr1")
+    tmpVgpr1Res = RegisterPoolResource(tmpVgpr1, 2)
+    dummy    = self.vgprPool.checkOut(1,"dummy")
+
+    with self.allocTmpSgpr(1) as tmpSgprInfo:
+      tmpSgpr = tmpSgprInfo.idx
+
+      # constant
+      MIBShape0 = kernel["MatrixInstM"] * kernel["MatrixInstBM"]
+      MIBShape1 = kernel["MatrixInstN"] * kernel["MatrixInstBN"]
+
+      matrixInstM = kernel["MatrixInstM"] * kernel["MatrixInstBM"] if (kernel["MatrixInstM"] == 4) else kernel["MatrixInstM"]
+      matrixInstN = kernel["MatrixInstN"] * kernel["MatrixInstBN"] if (kernel["MatrixInstN"] == 4) else kernel["MatrixInstN"]
+
+      # coord 1 : wave part
+      module.add(vectorStaticDivide(wave_id, "Serial", self.states.kernel["WavefrontSize"], tmpVgpr1Res))
+      module.add(vectorStaticDivide(tid1, wave_id, kernel["MIWaveGroup"][0], tmpVgpr1Res))
+      module.add(VMulLOU32(dst=vgpr(tid1), src0=hex(MIBShape1), src1=vgpr(tid1), comment="wave coordination offset 1"))
+
+      # coord 1 : thread part
+      module.add(vectorStaticRemainder(dummy, tmpVgpr0, "Serial", matrixInstN, tmpVgpr1Res, tmpSgprInfo))
+      module.add(VAddLShiftLeftU32(dst=vgpr(tid1), src0=vgpr(tmpVgpr0), src1=vgpr(tid1), shiftHex=log2(kernel["VectorWidthB"]), comment="coordination 1 = vwB *(wave_id1 + tid1)"))
+
+      # coord 1 : offset part
+      module.add(VMovB32(dst=vgpr(tmpVgpr1), src=hex(MT0 + ldsPad), \
               comment="lds stride = MT0 + PAD"))
-    module.add(VMulLOU32(dst=vgpr(tmpV0), src0=vgpr(wid), src1=vgpr(ldsStride), \
-              comment="lds coord1 offset = Col-id* lds stride"))
+      module.add(VMulLOU32(dst=vgpr(tid1), src0=vgpr(tid1), src1=vgpr(tmpVgpr1), comment=" offset 1"))
 
-    module.add(vectorStaticDivideAndRemainder(waveCoord0, wtid, wtid, wavelen, RegisterPoolResource(tmpV0, 2)))
-    module.add(VLShiftRightB32(dst=vgpr(coord0),
-              shiftHex=hex(log2(instN)), src=vgpr(wtid), \
-              comment="coord0 = tid / matrixInstN"))
+      # coord 0 : wave part
+      module.add(vectorStaticRemainder(dummy, tmpVgpr0, wave_id, kernel["MIWaveGroup"][0], tmpVgpr1Res, tmpSgprInfo))
+      module.add(VMulLOU32(dst=vgpr(tmpVgpr0), src0=hex(MIBShape0), src1=vgpr(tmpVgpr0), comment="wave coordination offset 0"))
 
-    if kernel["MIOutputVectorWidth"] > 1:
-      module.add(VLShiftLeftB32(dst=vgpr(coord0), shiftHex=hex(log2(kernel["MIOutputVectorWidth"])), src=vgpr(coord0), \
-              comment="lds coord0 offset *= 4 (each thread hold 4 element)"))
+      # coord 0 : thread part
+      module.add(vectorStaticRemainder(dummy, tid0, "Serial", self.states.kernel["WavefrontSize"], tmpVgpr1Res, tmpSgprInfo))
+      module.add(vectorStaticDivide(tid0, tid0, matrixInstN, tmpVgpr1Res))
+      module.add(staticMultiply(vgpr(tid0), vgpr(tid0), kernel["MIOutputVectorWidth"], tmpSgprInfo, "thread0 * continuous_output"))
+      module.add(VAddLShiftLeftU32(dst=vgpr(tid0), src0=vgpr(tmpVgpr0), src1=vgpr(tid0), shiftHex=log2(kernel["VectorWidthA"]), comment="coordination 0 = vwA *(wave_id0 + tid0)"))
 
-    module.add(VMadU32U24(dst=vgpr(coord0), src0=(instM * BM), src1=vgpr(waveCoord0), src2=vgpr(coord0), \
-              comment="coord0 += waveCoord0 * wave M shape(blockM*MiM)"))
+      # coord 1 + coord 0 :
+      module.add(VAddLShiftLeftU32(
+                dst=vgpr(b2bgemmLW), \
+                src0=vgpr(tid0), \
+                src1=vgpr(tid1), \
+                shiftHex=hex(log2(self.states.bpeCexternal)), \
+                comment="local write C address"))
 
-    module.add(VAddLShiftLeftU32(
-      dst=vgpr(b2bgemmLW), \
-      src0=vgpr(tmpV0), \
-      src1=vgpr(coord0), \
-      shiftHex=hex(log2(self.states.bpeCexternal)), \
-      comment="local write C address"))
+      if ldsOffsetToA1 > 0:
+        module.add(VMovB32(dst=vgpr(tmpVgpr0), src=hex(ldsOffsetToA1 * self.states.bpeCexternal)))
+        module.add(VAddU32(dst=vgpr(b2bgemmLW), src0=vgpr(b2bgemmLW), src1=vgpr(tmpVgpr0), \
+                  comment="LSD offset: For B1 LDS"))
 
-    if ldsOffsetToA1 > 0:
-      module.add(VMovB32(dst=vgpr(wtid), src=hex(ldsOffsetToA1 * self.states.bpeCexternal)))
-      module.add(VAddU32(dst=vgpr(b2bgemmLW), src0=vgpr(b2bgemmLW), src1=vgpr(wtid), \
-                comment="LSD offset: bDepthU * MT1"))
+    # release resource
+    self.vgprPool.checkIn(tid0)
+    self.vgprPool.checkIn(tid1)
+    self.vgprPool.checkIn(dummy)
+    self.vgprPool.checkIn(tmpVgpr1)
+    self.vgprPool.checkIn(tmpVgpr0)
+    self.vgprPool.checkIn(wave_id)
 
-    self.vgprPool.checkIn(tmpV0)
-    self.vgprPool.checkIn(wtid)
-    self.vgprPool.checkIn(wid)
     return module, b2bgemmLW
 
   def b2bgemmInitC(self, kernel) -> Module:
@@ -8145,7 +8160,8 @@ class KernelWriterAssembly(KernelWriter):
 
     ldsPadB1 = kernel["b2bGemmLdsBPad"]
     ldsStride = (ldsPadB1 + b2bgemmDepthU)
-    module.add(staticMultiply(vgpr(vIdx), vgpr(vgprGlobalReadColOffset), ldsStride, None))
+    with self.allocTmpSgpr(1) as tmpSgprInfo:
+      module.add(staticMultiply(vgpr(vIdx), vgpr(vgprGlobalReadColOffset), ldsStride, tmpSgprInfo))
     module.add(VAddLShiftLeftU32(
                 dst=vgpr(vgprLocalWriteAddressB), \
                 src0=vgpr(vIdx), \
@@ -8274,17 +8290,21 @@ class KernelWriterAssembly(KernelWriter):
 
     offsetVgpr = self.vgprPool.checkOut(1)
     numRegPerVec: int = round(vw * dstDataType.numRegisters())
-
+    print("VW = ",vw)
     for i, (t1, t0, vc1, vc0) in enumerate(elements):
       #TODO: handle vc1 or vc0 > 0
-      assert (vc0, vc1) == (0, 0)
-      #print("t1, t0, vc1, vc0 = ", t1,",",t0,",",vc1,",",vc0)
+      # For sourceswap=0:
+      # vc0 step = storeVW until vwA * miOutvw
+      # vc1 step = lds stride
+      stepVC0 = vw * vc0
+      stepVC1 = (kernel["MacroTile0"] + ldsPad) * vc0
       jumpBM  = t0 % numT0InSingleWT
       jumpWtM = t0 // numT0InSingleWT
-      jumpM   = jumpBM * tStride0 + jumpWtM * tWaveTileStride0
+      jumpM   = jumpBM * tStride0 + jumpWtM * tWaveTileStride0 + stepVC0
       jumpBN  = t1 % numT1InSingleWT
       jumpWtN = t1 // numT1InSingleWT
-      jumpN   = jumpBN * tStride1 + jumpWtN * tWaveTileStride1
+      jumpN   = jumpBN * tStride1 + jumpWtN * tWaveTileStride1 + stepVC1
+      print("t1, vc1, t0, vc0 = ", t1,",",vc1,",",t0,",",vc0, ", offset=",(jumpM + jumpN))
       vectorByteOffset = (jumpM + jumpN) * self.states.bpeCexternal
       mod.add(self.b2bgemmAddLocalWrite(vw, vectorByteOffset, archVgprIdx + i * numRegPerVec, coordByteOffsetVgpr))
 
@@ -8996,11 +9016,11 @@ class KernelWriterAssembly(KernelWriter):
 
     # default code
     if dupKernel["ScheduleIterAlg"] == 3:
-      dupKernel["PrefetchGlobalRead"] = 4 #kernel["PrefetchGlobalRead"]
+      dupKernel["PrefetchGlobalRead"] = 2 #kernel["PrefetchGlobalRead"]
       if kernel["PrefetchGlobalRead"] == 0:
         dupKernel["PrefetchGlobalRead"] = 1
       if kernel["PrefetchGlobalRead"] == 1:
-        dupKernel["PrefetchGlobalRead"] = 2
+        dupKernel["PrefetchGlobalRead"] = 1
       dupKernel["PrefetchLocalRead"]  = 1
     else:
       dupKernel["PrefetchGlobalRead"] = 0
