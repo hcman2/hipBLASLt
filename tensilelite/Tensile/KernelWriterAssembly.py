@@ -2336,7 +2336,7 @@ class KernelWriterAssembly(KernelWriter):
   ##############################################################################
   # Local Read Addresses: Final Offset A/B
   ##############################################################################
-  def lraFinalOffset(self, kernel, tP):
+  def lraFinalOffset(self, kernel, tP, vgprPrefix):
     module = Module("lraFinalOffset")
 
     tc = tP["tensorChar"]
@@ -2365,7 +2365,11 @@ class KernelWriterAssembly(KernelWriter):
         comment="LSU offset: lsuoffset = sgid*(MT%u+PAD)"%tile01))
 
     # final offset
-    finalVgpr = vgpr("LocalReadAddr%s"%tc)
+    if type(vgprPrefix) == int:
+      finalVgpr = vgpr(vgprPrefix)
+    else:
+      assert type(vgprPrefix)==str
+      finalVgpr = vgpr(vgprPrefix+"LocalReadAddr%s"%tc)
     if (kernel["DirectToLds%s" % tc] and \
         kernel["GlobalReadVectorWidth%c"%tc] * tP["bpe"] > 4):
       # DirectToLds + DGEMM case
@@ -4761,9 +4765,9 @@ class KernelWriterAssembly(KernelWriter):
         self.states.numReadsIterCoalescedB = 1
 
         imod.add(self.lraTileAssignment(kernel, tPA, tPB))
-        imod.add(self.lraFinalOffset(kernel, tPA))
+        imod.add(self.lraFinalOffset(kernel, tPA, ""))
         imod.add(self.lraDeclareAddresses(kernel, tPA))
-        imod.add(self.lraFinalOffset(kernel, tPB))
+        imod.add(self.lraFinalOffset(kernel, tPB, ""))
         imod.add(self.lraDeclareAddresses(kernel, tPB))
 
         localRead2Perpendicular = False
@@ -8648,6 +8652,122 @@ class KernelWriterAssembly(KernelWriter):
                 localReadCode.add(localReadX(dst=destVgpr, src=vgpr(srcVgprIdx), ds=ds, comment=comment))
     return imod, pack
 
+  def b2bgemmPerformLocalRead2(self, kernel, tP, bufferIdx: int, iui: int, vgprPrefix="") -> Tuple[Module, Module]:
+
+    imod = Module("LocalReadDo%s_I%s" % (tP["tensorChar"],iui))
+
+    tc               = tP["tensorChar"]
+    tile01           = tP["tile01Idx"]
+    instruction      = tP["localReadInstruction"]
+
+    numOffsets       = instruction.numOffsets
+    blockWidth       = instruction.blockWidth
+    unrollBlockWidth = instruction.blockWidth if kernel["UnrollMajorLDS%s"%tc] else tP["bpe"]/4
+    tileBlockWidth   = tP["bpe"]/4 if kernel["UnrollMajorLDS%s"%tc] else instruction.blockWidth
+
+    vectorWidth  = kernel["VectorWidth%s"%tc]
+
+    MIWaveGroupShape = [ kernel["MatrixInstM"] * kernel["MatrixInstBM"] * kernel["MIWaveGroup"][0] * kernel["VectorWidthA"], \
+                        kernel["MatrixInstN"] * kernel["MatrixInstBN"] * kernel["MIWaveGroup"][1] * kernel["VectorWidthB"]]
+
+    LdsPad           = kernel["LdsPad%s"%tc] if kernel["LdsBlockSizePerPad%s"%tc] == 0 else 0
+    tileStride       = 1
+    UnrollStride     = kernel["MacroTile%s" % tP["tensorChar"]] + LdsPad
+    if kernel["UnrollMajorLDS%s" % tP["tensorChar"]]:
+        tileStride   = kernel["DepthU"] + LdsPad
+        UnrollStride = 1
+
+    numVectorsPerTile = kernel["MIWaveTile"][tile01] // vectorWidth
+    numReadsPerVector = (vectorWidth * tP["bpe"]) // int(tileBlockWidth * 4) # bytes/register
+    # overloading numReadsPerUnroll for DirectToLds x2/x4 case when blockWidth of instruction < LocalReadVectorWidth
+    # fp64 TLU=1 reading 0.5element/lane/read..
+    # for TLU=0 case, blockWidth and LRVW should match
+    numReadsPerUnroll = ceil(tP["bpe"] * kernel["MIInputPerThread"] / int(unrollBlockWidth * 4)) # bytes/register
+    numVgpr  = int(ceil(blockWidth))
+
+    # pack register
+    needPack = tP["bpe"] < 4 and not kernel["UnrollMajorLDS%s"%tc]
+    pack     = Module("pack%s_I%s"%(tc,iui))
+
+    valufIdx = 0
+    for vIdx in range(0, numVectorsPerTile):
+        for eIdx in range(0, numReadsPerVector):
+            valuiIdx = int(valufIdx)
+            localReadCode = imod.add(Module("LocalRead%s Valu%u"%(tc,valuiIdx)))
+            if needPack:
+                packCode = pack.add(Module("packCode"))
+            for rIdx in range(0, numReadsPerUnroll):
+                valuiIdx = int(valufIdx)
+                baseLRVgpr = vgpr("Valu%s_X%u_I%u+%u"%(tc, bufferIdx, iui, valuiIdx), numVgpr)
+                destVgpr = baseLRVgpr
+
+                if (self.states.lrvwTileA > 1 and tc == 'A') or (self.states.lrvwTileB > 1 and tc == 'B'):
+                    highBitsForHalf = 0
+                    isHigh8Bits = 0
+                    isHigh16Bits = 0
+                    if needPack:
+                        destVgpr = vgpr(vgprPrefix+"Valu%s_X%u_I%u_D%u+%u"%(tc, bufferIdx, iui, rIdx%(kernel["MIInputPerThread"]), vIdx*numVgpr), numVgpr)
+                    if rIdx == numReadsPerUnroll-1:
+                        for i in range(0, numVgpr):
+                            # convert from [tile][MiInputPerThread][vector] to [tile][vector][MiInputPerThread]
+                            vgprIdx = (vIdx*numVgpr+i)*tP["bpe"]*kernel["MIInputPerThread"]//self.states.bpr*min(self.states.bpr//tP["bpe"],vectorWidth)
+                            if kernel["ProblemType"]["DataType"].isHalf() or kernel["MFMA_BF16_1K"]:
+                                packCode.add(VPermB32(dst=vgpr(vgprPrefix+"Valu%s_X%u_I%u+%u"%(tc, bufferIdx, iui, vgprIdx + 0)), src0=vgpr(vgprPrefix+"Valu%s_X%u_I%u_D1+%u"%(tc, bufferIdx, iui, i+vIdx*numVgpr)), src1=vgpr(vgprPrefix+"Valu%s_X%u_I%u_D0+%u"%(tc, bufferIdx, iui, i+vIdx*numVgpr)), src2=sgpr("PackKForV0"), comment="select K=01 for vector=0"))
+                                packCode.add(VPermB32(dst=vgpr(vgprPrefix+"Valu%s_X%u_I%u+%u"%(tc, bufferIdx, iui, vgprIdx + 1)), src0=vgpr(vgprPrefix+"Valu%s_X%u_I%u_D3+%u"%(tc, bufferIdx, iui, i+vIdx*numVgpr)), src1=vgpr(vgprPrefix+"Valu%s_X%u_I%u_D2+%u"%(tc, bufferIdx, iui, i+vIdx*numVgpr)), src2=sgpr("PackKForV0"), comment="select K=23 for vector=0"))
+                                packCode.add(VPermB32(dst=vgpr(vgprPrefix+"Valu%s_X%u_I%u+%u"%(tc, bufferIdx, iui, vgprIdx + 2)), src0=vgpr(vgprPrefix+"Valu%s_X%u_I%u_D1+%u"%(tc, bufferIdx, iui, i+vIdx*numVgpr)), src1=vgpr(vgprPrefix+"Valu%s_X%u_I%u_D0+%u"%(tc, bufferIdx, iui, i+vIdx*numVgpr)), src2=sgpr("PackKForV1"), comment="select K=01 for vector=1"))
+                                packCode.add(VPermB32(dst=vgpr(vgprPrefix+"Valu%s_X%u_I%u+%u"%(tc, bufferIdx, iui, vgprIdx + 3)), src0=vgpr(vgprPrefix+"Valu%s_X%u_I%u_D3+%u"%(tc, bufferIdx, iui, i+vIdx*numVgpr)), src1=vgpr(vgprPrefix+"Valu%s_X%u_I%u_D2+%u"%(tc, bufferIdx, iui, i+vIdx*numVgpr)), src2=sgpr("PackKForV1"), comment="select K=23 for vector=1"))
+                            elif kernel["ProblemType"]["DataType"].isBFloat16():
+                                packCode.add(VPermB32(dst=vgpr(vgprPrefix+"Valu%s_X%u_I%u+%u"%(tc, bufferIdx, iui, vgprIdx + 0)), src0=vgpr(vgprPrefix+"Valu%s_X%u_I%u_D1+%u"%(tc, bufferIdx, iui, i+vIdx*numVgpr)), src1=vgpr(vgprPrefix+"Valu%s_X%u_I%u_D0+%u"%(tc, bufferIdx, iui, i+vIdx*numVgpr)), src2=sgpr("PackKForV0"), comment="select K=01 for vector=0"))
+                                packCode.add(VPermB32(dst=vgpr(vgprPrefix+"Valu%s_X%u_I%u+%u"%(tc, bufferIdx, iui, vgprIdx + 1)), src0=vgpr(vgprPrefix+"Valu%s_X%u_I%u_D1+%u"%(tc, bufferIdx, iui, i+vIdx*numVgpr)), src1=vgpr(vgprPrefix+"Valu%s_X%u_I%u_D0+%u"%(tc, bufferIdx, iui, i+vIdx*numVgpr)), src2=sgpr("PackKForV1"), comment="select K=01 for vector=1"))
+                            # b2bgemm doesn't support int8 yet
+                else:
+                    # pack for blockWidth 0.5 type
+                    highBitsForHalf = (blockWidth == 0.5) and ((rIdx % 2) == 1) # rIdx = 1,3
+                    if needPack and highBitsForHalf:
+                        highVgpr = vgpr(vgprPrefix+"Valu%s_X%u_I%u_D%u+%u"%(tc, bufferIdx, iui, rIdx%2, valuiIdx), numVgpr)
+                        packCode.add(VOrB32(dst=baseLRVgpr, src0=baseLRVgpr, src1=highVgpr, comment="pack two half Vgpr to one Vgpr"))
+                        destVgpr = highVgpr
+                    # pack for blockWidth 0.25 type
+                    isHigh8Bits  = (blockWidth == 0.25) and ( ((rIdx % 4) % 2) == 1) # rIdx = 1,3
+                    isHigh16Bits = (blockWidth == 0.25) and ( ((rIdx % 4) //2) == 1) # rIdx = 2,3
+                    if needPack and rIdx != 0:
+                        if isHigh8Bits or isHigh16Bits:
+                            highVgpr = vgpr(vgprPrefix+"Valu%s_X%u_I%u_D%u+%u"%(tc, bufferIdx, iui, rIdx%4, valuiIdx), numVgpr)
+                            destVgpr = highVgpr
+                        if isHigh8Bits:
+                            lowVgpr = vgpr(vgprPrefix+"Valu%s_X%u_I%u_D%u+%u"%(tc, bufferIdx, iui, rIdx-1, valuiIdx), numVgpr) if isHigh16Bits else baseLRVgpr
+                            packCode.add(VLShiftLeftOrB32(dst=lowVgpr, src0=highVgpr, src1=8, src2=lowVgpr, comment="pack two int8 Vgpr to one half Vgpr"))
+                            if isHigh16Bits:
+                                packCode.add(VOrB32(dst=baseLRVgpr, src0=baseLRVgpr, src1=lowVgpr, comment="pack two half Vgpr to one Vgpr"))
+                valufIdx += blockWidth
+
+                # load read instrution
+                paramList = []
+
+                for oIdx in range(0, numOffsets):
+                    # normal case, no DirectToLDS for b2bgemm
+                    offset_val = (eIdx + (vIdx * numOffsets+oIdx) * MIWaveGroupShape[tile01]) * tileStride
+                    offset_val = (rIdx * UnrollStride + offset_val + tP["localReadOffset"]) * tP["bpe"]
+                    if (kernel["LdsBlockSizePerPad%s"%tc] != 0) and (kernel["LdsPad%s"%tc] != 0):
+                        offset_val = offset_val + (offset_val // kernel["LdsBlockSizePerPad%s"%tc]) * kernel["LdsPad%s"%tc] * tP["bpe"]
+                    offset_val = offset_val + tP["localReadSwapByteOffset"]
+
+                    paramList.append(int(offset_val))
+
+                comment = "L -> Reg lro=%d swapByteOffset=%u ti=%u vIdx=%u eIdx=%u rIdx=%u oIdx=%u buffer=%u iui=%u" \
+                            % (tP["localReadOffset"], tP["localReadSwapByteOffset"], MIWaveGroupShape[tile01], vIdx, eIdx, rIdx, oIdx, bufferIdx, iui)
+
+                highBits = highBitsForHalf or isHigh16Bits
+
+                if numOffsets == 1:
+                    ds = DSModifiers(na=1, offset=paramList[0])
+                else:
+                    ds = DSModifiers(na=2, offset0=paramList[0], offset1=paramList[1])
+                LocalReadX = instruction.getInst(highBits)
+                localReadCode.add(LocalReadX(dst=destVgpr, src=vgpr(vgprPrefix+"LocalReadAddr%s"%tc), ds=ds, comment=comment))
+
+    return imod, pack
+
   def b2bgemmLocalReadA1(self, kernel, tP, rowVgprIdx, kIdx: int, vgprReadIncIdx: int, loadVgpr: int) -> Tuple[Module, Module, Module]:
     module = Module()
     waveTileM, waveTileN = kernel["MIWaveTile"]
@@ -8673,6 +8793,7 @@ class KernelWriterAssembly(KernelWriter):
       waveTileOffsetBytes = waveTileOffset * elemNumBytes
       scalarOffset = kIdx * strideN * elemNumBytes
       lr, pack = self.b2bgemmPerformLocalRead(kernel, tP, vgprIdx, numVgprRequiredPerVector, rowVgprIdx, vectorLen, elemNumBytes, waveTileOffsetBytes, False, scalarOffset)
+      lr2, pack2 = self.b2bgemmPerformLocalRead2(kernel, tP, 0, (kIdx % kernel["b2bGemmDepthU"]) // kernel["MatrixInstK"], "b2bg")
       module.add(lr)
       packs.append(pack)
 
@@ -8983,6 +9104,28 @@ class KernelWriterAssembly(KernelWriter):
 
     return module, mfmaNum
 
+  def b2bgemmCalcLocalReadAddressesA(self, kernel, tPA) -> Tuple[Module, int]:
+    # tP["gpr"]["lro"] is updated
+
+    b2bgemmLdsA1OffsetByte = (kernel["b2bGemmDepthU"] + kernel["b2bGemmLdsBPad"]) * kernel["MacroTile1"] * tPA["bpe"]
+    if kernel["b2bGemm1LDSBuffer"] == 0:
+      b2bgemmLdsA1OffsetByte *= 2
+
+    component = Component.LraTileAssignment.find(self)
+    lraSetupCode = Module()
+    lraAddrRowVgprIdx = self.vgprPool.checkOut(1, "b2bgLocalReadAddrA")
+    if component:
+      lraSetupCode.add(component(self, kernel, tPA))
+      lraSetupCode.add(self.lraFinalOffset(kernel, tPA, lraAddrRowVgprIdx))
+      if b2bgemmLdsA1OffsetByte > 0:
+        tmp = self.vgprPool.checkOut(1)
+        lraSetupCode.add(VMovB32(dst=vgpr(tmp), src=hex(b2bgemmLdsA1OffsetByte)))
+        lraSetupCode.add(VAddU32(dst=vgpr(lraAddrRowVgprIdx), src0=vgpr(lraAddrRowVgprIdx), src1=vgpr(tmp), \
+              comment="LSD offset"))
+        self.vgprPool.checkIn(tmp)
+
+    return lraSetupCode, lraAddrRowVgprIdx
+
   def b2bgemm(self, kernel, tPA, tPB):
     '''
     Unroll loop here, since K = MT1 is static constant.
@@ -9012,8 +9155,9 @@ class KernelWriterAssembly(KernelWriter):
     b2bgemmLdsAPad = kernel["b2bGemmLdsAPad"]
     b2bgemmLdsBPad = kernel["b2bGemmLdsBPad"]
     b2bgemmDepthU = kernel["b2bGemmDepthU"]
-    b2bgemmLdsA1Offset = (b2bgemmDepthU + b2bgemmLdsBPad) * MT1
-
+    b2bgemmLdsA1OffsetByte = (b2bgemmDepthU + b2bgemmLdsBPad) * MT1 * elemNumBytes
+    if kernel["b2bGemm1LDSBuffer"] == 0:
+      b2bgemmLdsA1OffsetByte *= 2
     # default code
     if dupKernel["ScheduleIterAlg"] == 3:
       dupKernel["PrefetchGlobalRead"] = 2 #kernel["PrefetchGlobalRead"]
@@ -9082,8 +9226,9 @@ class KernelWriterAssembly(KernelWriter):
     lrbSetupCode,lrbAddrColVgprIdx, vLRSwapB = self.b2bgemmCalculateLocalReadB1InitialIndex(dupKernel, waveGroupM, wavelen, instN, instK, instB, BN)
     #module.add(lrbSetupCode)
 
-    lraSetupCode, lraAddrRowVgprIdx = self.b2bgemmCalculateLocalReadAInitialIndex(dupKernel, waveGroupM, wavelen, instM, instK, instB, BM)
+    #lraSetupCode, lraAddrRowVgprIdx = self.b2bgemmCalculateLocalReadAInitialIndex(dupKernel, waveGroupM, wavelen, instM, instK, instB, BM)
     #module.add(lraSetupCode)
+    lraSetupCode, lraAddrRowVgprIdx = self.b2bgemmCalcLocalReadAddressesA(dupKernel, tPA)
 
     self.b2bSwapLWBCode.add(VSwapB32(vgpr(vLWAddrB), vgpr(vLWSwapB)))
     self.b2bSwapLRBCode.add(VSwapB32(vgpr(lrbAddrColVgprIdx), vgpr(vLRSwapB)))
@@ -9098,8 +9243,7 @@ class KernelWriterAssembly(KernelWriter):
       module.add(item)
     module.add(lrbSetupCode)
     module.add(lraSetupCode)
-    #print("=====lrbSetupCode======",len(lrbSetupCode.flatitems()))
-    #print("=====lraSetupCode======",len(lraSetupCode.flatitems()))
+    module.add(Label("b2bg_lrabset_done",""))
 
     packCode = [Module() for i in range(b2bgemmPrefetchLocalRead + 1)]
     plrA1Code = Module()
@@ -9154,8 +9298,6 @@ class KernelWriterAssembly(KernelWriter):
     #    module.add(prefetchGRCode[i])
     module.add(plrA1Code)
 
-    #module.add(initAccvgprCode)
-    #print("=====Init Accvgpr======",len(initAccvgprCode.flatitems()))
     module.add(SWaitCnt(lgkmcnt=0, comment="wait LW"))
     module.add(self._syncThreads(kernel, comment="Wait for LW done"))
     module.add(plrB1Code)

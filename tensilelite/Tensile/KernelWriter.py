@@ -1808,9 +1808,9 @@ class KernelWriter(metaclass=abc.ABCMeta):
 
     # final offsets
     lralwaMod.addComment1("local read addresses: final offsets a")
-    lralwaMod.add(self.lraFinalOffset(kernel, tensorParametersA))
+    lralwaMod.add(self.lraFinalOffset(kernel, tensorParametersA, ""))
     lralwaMod.addComment1("local read addresses: final offsets b")
-    lralwaMod.add(self.lraFinalOffset(kernel, tensorParametersB))
+    lralwaMod.add(self.lraFinalOffset(kernel, tensorParametersB, ""))
 
     # declare addresses
     lralwaMod.addComment1("local read addresses: declare addresses a")
@@ -3373,7 +3373,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
   # Local Read Addresses: Final Offset A/B
   ##############################################################################
   @abc.abstractmethod
-  def lraFinalOffset(self, kernel, tP):
+  def lraFinalOffset(self, kernel, tP, vgprPrefix):
     return ""
 
   ##############################################################################
