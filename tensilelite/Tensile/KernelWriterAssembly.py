@@ -9953,6 +9953,11 @@ class KernelWriterAssembly(KernelWriter):
               iterCode.add(self.b2bSwapLRBCode)
               iterCode.add(self.b2bSwapLWBCode)
             if syncForLWDone:
+              #LRA go first
+              while lraIterItem:
+                loadModule = lraIterItem.pop(0)
+                iterCode.add(loadModule)
+                additionalLRIssued += 1
               while lrbIterItem:
                 loadModule = lrbIterItem.pop(0)
                 iterCode.add(loadModule)
@@ -10271,21 +10276,21 @@ class KernelWriterAssembly(KernelWriter):
           module.add(item)
 
     if b2bgemmPrefetchGlobalRead > 0:
-    lwbItems = localWriteB1Code[0].flatitems()
-    while lwbItems:
-      item = lwbItems.pop(0)
-      module.add(SWaitCnt(vmcnt=self.b2bIssuedGRToBeWaited - 1, comment="Wait for PGR0"))
-      module.add(item)
-      self.b2bIssuedGRToBeWaited -= 1
-    lwCodeIdx += 1
-    # gr after lw
-    grItems = prefetchGRCode[grCodeIdx].flatitems()
-    while grItems:
-      item = grItems.pop(0)
-      module.add(item)
-      self.b2bIssuedGRToBeWaited += 1
-    grCodeIdx += 1
-    module.add(grbIncCode)
+      lwbItems = localWriteB1Code[0].flatitems()
+      while lwbItems:
+        item = lwbItems.pop(0)
+        module.add(SWaitCnt(vmcnt=self.b2bIssuedGRToBeWaited - 1, comment="Wait for PGR0"))
+        module.add(item)
+        self.b2bIssuedGRToBeWaited -= 1
+      lwCodeIdx += 1
+      # gr after lw
+      grItems = prefetchGRCode[grCodeIdx].flatitems()
+      while grItems:
+        item = grItems.pop(0)
+        module.add(item)
+        self.b2bIssuedGRToBeWaited += 1
+      grCodeIdx += 1
+      module.add(grbIncCode)
     
     #if b2bgemmPrefetchGlobalRead > 2:
     #  for i in range(2,b2bgemmPrefetchGlobalRead,1):
