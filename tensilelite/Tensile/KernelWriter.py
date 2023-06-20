@@ -2912,12 +2912,12 @@ class KernelWriter(metaclass=abc.ABCMeta):
       if extraSpace == 0:
         self.b2bgVGPRIdx = vgprIdx
         self.b2bgVGPRAddr = vgprIdx + self.b2bgVGPRNumber
-        vgprIdx = self.b2bgVGPRAddr
+        vgprIdx = self.b2bgVGPRAddr + 1
         self.b2bgVGPRIdxStart = self.b2bgVGPRIdx
       else:
         self.b2bgVGPRAddr = vgprIdx
         self.b2bgVGPRIdx = vgprIdx + 4 - (vgprIdx % 4)
-        vgprIdx = vgprIdx + self.b2bgVGPRNumber
+        vgprIdx = self.b2bgVGPRIdx + self.b2bgVGPRNumber
         self.b2bgVGPRIdxStart = self.b2bgVGPRAddr
       self.b2bgVGPRIdxEnd = vgprIdx
 
