@@ -10211,7 +10211,9 @@ class KernelWriterAssembly(KernelWriter):
     module.add(RegSet("v", "vgprLWAddrB", vLWAddrB))
     if kernel["b2bGemm1LDSBuffer"] == 0:
       vLWSwapB = self.vgprPool.checkOut(1)
-      module.add(RegSet("v", "vgprLWSwapB", vLWSwapB))
+    else:
+      vLWSwapB = vLWAddrB
+    module.add(RegSet("v", "vgprLWSwapB", vLWSwapB))
     if needPerm:
       self.defineSgpr("PackKForV0", 1, 1)
       self.defineSgpr("PackKForV1", 1, 1)
