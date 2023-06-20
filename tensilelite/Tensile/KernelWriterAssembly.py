@@ -9918,7 +9918,7 @@ class KernelWriterAssembly(KernelWriter):
             if self.b2bLWCode:
               loadModule = self.b2bLWCode.pop(0)
               if isSyncEveryLW:
-                iterCode.add(SWaitCnt(vmcnt=self.b2bIssuedGRToBeWaited - 1, comment="wait GR excluding the PGR2 parts"))
+                iterCode.add(SWaitCnt(vmcnt=max(0, self.b2bIssuedGRToBeWaited - 1), comment="wait GR excluding the PGR2 parts"))
               iterCode.add(loadModule)
               self.b2bIssuedGRToBeWaited -= 1
               # gr after lw
@@ -9932,7 +9932,7 @@ class KernelWriterAssembly(KernelWriter):
             while self.b2bLWCode:
               loadModule = self.b2bLWCode.pop(0)
               if isSyncEveryLW:
-                iterCode.add(SWaitCnt(vmcnt=self.b2bIssuedGRToBeWaited - 1, comment="wait GR excluding the PGR2 parts"))
+                iterCode.add(SWaitCnt(vmcnt=max(0, self.b2bIssuedGRToBeWaited - 1), comment="wait GR excluding the PGR2 parts"))
               iterCode.add(loadModule)
               self.b2bIssuedGRToBeWaited -= 1
               # gr after lw
@@ -10308,7 +10308,7 @@ class KernelWriterAssembly(KernelWriter):
       lwbItems = self.b2bgLocalWriteB1Code[0].flatitems()
       while lwbItems:
         item = lwbItems.pop(0)
-        module.add(SWaitCnt(vmcnt=self.b2bIssuedGRToBeWaited - 1, comment="Wait for PGR0"))
+        module.add(SWaitCnt(vmcnt=max(0, self.b2bIssuedGRToBeWaited - 1), comment="Wait for PGR0"))
         module.add(item)
         self.b2bIssuedGRToBeWaited -= 1
       lwCodeIdx += 1
