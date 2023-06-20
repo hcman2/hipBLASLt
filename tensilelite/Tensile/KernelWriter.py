@@ -3194,6 +3194,22 @@ class KernelWriter(metaclass=abc.ABCMeta):
       self.states.startVgprAlphaTmp = vgprIdx
       vgprIdx += 4
 
+    # b2bgemm preloaded VGPRs
+    if kernel["ProblemType"]["B2BGemm"]:
+      self.b2bgVGPRNumber = kernel["MacroTile1"] * kernel["b2bGemmDepthToBePreload"] * tensorParametersB["bpe"] // kernel["WavefrontSize"] // kernel["MIWaveGroup"][0] // kernel["MIWaveGroup"][1] // 4
+      extraSpace = vgprIdx % 4
+      if extraSpace == 0:
+        self.b2bgVGPRIdx = vgprIdx
+        self.b2bgVGPRAddr = vgprIdx + self.b2bgVGPRNumber
+        vgprIdx = self.b2bgVGPRAddr
+        self.b2bgVGPRIdxStart = self.b2bgVGPRIdx
+      else:
+        self.b2bgVGPRAddr = vgprIdx
+        self.b2bgVGPRIdx = vgprIdx + 4 - (vgprIdx % 4)
+        vgprIdx = vgprIdx + self.b2bgVGPRNumber
+        self.b2bgVGPRIdxStart = self.b2bgVGPRAddr
+      self.b2bgVGPRIdxEnd = vgprIdx
+
     # TODO: Serial is always the first/last register in the pool so the store
     # code doesn't have to deal with fragmentation
     self.states.startVgprSerial = vgprIdx
