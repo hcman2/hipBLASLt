@@ -3004,14 +3004,14 @@ class Solution(collections.abc.Mapping):
       state["b2bGemmLdsBPad"] = state["LdsPadB"]
       state["b2bGemmLdsAPad"] = state["LdsPadA"]
       state["b2bGemm1LDSBuffer"] = state["1LDSBuffer"]
-
+      state["b2bGemmDepthToBePreload"] = 32
       #state["b2bGemmDepthU"] = 16 # 16 or 32 is recommanded
       #state["b2bGemmLdsBPad"] = 0
       #state["b2bGemmLdsAPad"] = 4
       #state["b2bGemm1LDSBuffer"] = 0
       if state["ScheduleIterAlg"] != 3:
         state["b2bGemm1LDSBuffer"] = 1
-      
+
       b2bGEMMNumLDSB1Buffer = 1 if state["b2bGemm1LDSBuffer"] else 2
       b2bGEMMExtraLdsElementsForB1 = (state["b2bGemmDepthU"] + state["b2bGemmLdsBPad"] )* state["MacroTile1"] * b2bGEMMNumLDSB1Buffer
       b2bGEMMLdsAPad = state["b2bGemmLdsAPad"]
