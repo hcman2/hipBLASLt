@@ -2083,6 +2083,12 @@ class KernelWriter(metaclass=abc.ABCMeta):
         module.add(self.localWriteSwapOffsets(kernel, expand, tensorParametersB))
 
     if kernel["PrefetchGlobalRead"] == 2:
+      if kernel["ProblemType"]["B2BGemm"]:
+        module.addComment1("b2bgemm preload to registers")
+        for i in range(self.b2bgNumGRBeforeNGLLFirst):
+          module.add(self.b2bgemmGetPGRCode())
+          self.b2bIssuedGRToBeWaited += self.b2bgNumGRInstToBeIssued
+          module.add(self.b2bgemmGetGRIncCode())
       module.add(self.noLoadLoop(kernel, tensorParametersA, tensorParametersB, isOptNLL=False, isNGLL=True, pack=pack))
 
     # This "NoLoad" loop is a copy of the unroll loop but with global loads + LDS writes removed
@@ -2106,6 +2112,12 @@ class KernelWriter(metaclass=abc.ABCMeta):
           deepCopyPack = fastdeepcopy(pack)
           module.add(self.noLoadLoop(kernel, tensorParametersA, tensorParametersB, isOptNLL=True, isNGLL=False, pack=deepCopyPack))
           self.restoreLocalPointers(kernel, tensorParametersA, tensorParametersB)
+        if kernel["ProblemType"]["B2BGemm"]:
+          module.addComment1("b2bgemm preload to registers")
+          for i in range(self.b2bgNumGRBeforeNGLLLast):
+            module.add(self.b2bgemmGetPGRCode())
+            self.b2bIssuedGRToBeWaited += self.b2bgNumGRInstToBeIssued
+            module.add(self.b2bgemmGetGRIncCode())
         module.add(self.noLoadLoop(kernel, tensorParametersA, tensorParametersB, isOptNLL=False, isNGLL=False, pack=pack))
 
     if self.states.staggerU and self.states.actualSummationLoops>1:
@@ -3196,19 +3208,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
 
     # b2bgemm preloaded VGPRs
     if kernel["ProblemType"]["B2BGemm"]:
-      self.b2bgVGPRNumber = kernel["MacroTile1"] * kernel["b2bGemmDepthToBePreload"] * tensorParametersB["bpe"] // kernel["WavefrontSize"] // kernel["MIWaveGroup"][0] // kernel["MIWaveGroup"][1] // 4
-      extraSpace = vgprIdx % 4
-      if extraSpace == 0:
-        self.b2bgVGPRIdx = vgprIdx
-        self.b2bgVGPRAddr = vgprIdx + self.b2bgVGPRNumber
-        vgprIdx = self.b2bgVGPRAddr + 1
-        self.b2bgVGPRIdxStart = self.b2bgVGPRIdx
-      else:
-        self.b2bgVGPRAddr = vgprIdx
-        self.b2bgVGPRIdx = vgprIdx + 4 - (vgprIdx % 4)
-        vgprIdx = self.b2bgVGPRIdx + self.b2bgVGPRNumber
-        self.b2bgVGPRIdxStart = self.b2bgVGPRAddr
-      self.b2bgVGPRIdxEnd = vgprIdx
+      vgprIdx = self.b2bgemmGetPreLoadedVGPRNumber(kernel, tensorParametersB, vgprIdx)
 
     # TODO: Serial is always the first/last register in the pool so the store
     # code doesn't have to deal with fragmentation
@@ -3382,6 +3382,23 @@ class KernelWriter(metaclass=abc.ABCMeta):
     self.defineSgpr("OrigStaggerUIter", 1)  # Original stagger register.  Only needed for Persistent
     self.defineSgpr("NumWorkGroups0", 1)
     self.defineSgpr("NumWorkGroups1", 1)
+
+    # Occupy sgpr for b2bgemm before lastPostLoopSgpr
+    if kernel["ProblemType"]["B2BGemm"]:
+      self.defineSgpr("StridesB1", 2, 2)
+      self.defineSgpr("SrdB1", 4, 4)
+      numWave = kernel["MIWaveGroup"][0] * kernel["MIWaveGroup"][1]
+      colOffsetForWave = kernel["MacroTile1"] // numWave
+      numReadPerWave = colOffsetForWave * kernel["b2bGemmDepthU"]
+      numReadPerThread = numReadPerWave // kernel["WavefrontSize"]
+      assert numReadPerThread != 0
+      b2bgGRVW = 16 // tensorParametersB["bpe"]
+      b2bgGRVW = min(b2bgGRVW, numReadPerThread)
+      assert numReadPerThread % b2bgGRVW == 0
+      numGRInstToBeIssued = numReadPerThread // b2bgGRVW
+      for i in range(numGRInstToBeIssued - 1):
+        sgprName = "GlobalReadOffsetB1%u"%i
+        self.defineSgpr(sgprName, 1)
 
     #------------------------
     # Registers defined below this point are not available in the post-loop
