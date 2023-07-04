@@ -637,7 +637,10 @@ def assignLWSchedIndexDefault(writer, kernel, numLocalWritesPerSched, localWrite
 
 def getReadsToWait(writer, kernel):
     readsToWait = len(list(writer.codes.localWriteA.items())) + len(list(writer.codes.localWriteB.items()))
-    readsToWaitNGLL = readsToWait
+    b2bgReadsCnt = 0
+    if kernel["ProblemType"]["B2BGemm"]:
+        b2bgReadsCnt = writer.b2bgNumGRBeforeNGLLFirst * writer.b2bgNumGRInstToBeIssued
+    readsToWaitNGLL = readsToWait + b2bgReadsCnt
     return readsToWait, readsToWaitNGLL
 
 def schedLocalWrite(writer, kernel, numLocalWriteModPerIter, numLocalWritesPerSched, localWriteEndIter, \
