@@ -363,8 +363,8 @@ namespace Tensile
             TensorDescriptor const& b = problem.b();
             size_t startStrideAB = problemType.useInitialStridesAB ? 0 : 1;
             for(size_t i = startStrideAB; i < b.dimensions(); i++)
-                args.append<uint32_t>(concatenate_if<T_Debug>("strideB1", i), b.strides()[i]);
-            args.append<void const*>("B1", inputs.b);
+                args.template append<uint32_t>(concatenate_if<T_Debug>("strideB1", i), b.strides()[i]);
+            args.template append<void const*>("B1", inputs.b);
             return;
         }
 
@@ -1687,7 +1687,7 @@ template <typename KA>
         {
             auto& gemms = b2bProblem->gemms;
             auto gemmInputs = dynamic_cast<ContractionGroupedInputs const*>(&inputs);
-            return solveB2BGemm(gemms, (*gemmInputs), hardware, stream);
+            return solveB2BGemm(gemms, (*gemmInputs), hardware, hipHostMemory, hipHostMemorySize, stream);
         }
         else
         {
@@ -1996,6 +1996,8 @@ template <typename KA>
     std::vector<ContractionSolution::Problem> const& problems,
     ContractionSolution::GroupedInputs const&        inputs,
     Hardware const&                                  hardware,
+    void*                                            hipHostMemory,
+    size_t                                           hipHostMemorySize,
     hipStream_t                                      stream) const
     {
         if(Debug::Instance().printWinningKernelName())
