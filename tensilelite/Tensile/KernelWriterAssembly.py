@@ -8507,187 +8507,11 @@ class KernelWriterAssembly(KernelWriter):
 
   def b2bgemmLocalReadB1(self, kernel, tP, lrB1Addr, kIdx: int, loadVgpr: int) -> Tuple[Module, int, int]:
     lrB1code = Module("B2BGEMM Local Read B1")
-    wavelen = kernel["WavefrontSize"]
-    waveTileM, waveTileN = kernel["MIWaveTile"]
-    elemNumBytes = kernel["ProblemType"]["DataType"].numBytes()
-    numTotalDataFromB1 = kernel["MatrixInstK"] * kernel["MatrixInstN"] * kernel["MatrixInstB"] * elemNumBytes
-    numVgprRequiredPerVector = numTotalDataFromB1 // wavelen // 4
-    BM = kernel["MatrixInstBM"]
-    BN = kernel["MatrixInstBN"]
-    waveMT0, waveMT1 = kernel["MatrixInstM"] * BM, kernel["MatrixInstN"] * BN
-    waveGroupM, waveGroupN = kernel["MIWaveGroup"]
-    strideM, strideN = 1, waveMT1 * waveGroupN #since we assume MT1 == K1
     b2bgDepthU = kernel["b2bGemmDepthU"]
-    ldsPadB1 = kernel["b2bGemmLdsBPad"]
-    ldsStride = b2bgDepthU + ldsPadB1
-
-    localReadX = DSLoadB64
-    if numVgprRequiredPerVector == 1:
-      localReadX = DSLoadB32
-    if numVgprRequiredPerVector == 4:
-      localReadX = DSLoadB128
-
-    for wn in range(waveTileN):
-      lrB1Idx = self.b2bgemmCalcInputVgprIdx(loadVgpr, numVgprRequiredPerVector, wn)
-      # Calculate offset
-      offset_val = strideN * wn * ldsStride
-      offset_val += kIdx % b2bgDepthU
-      offset_val *= elemNumBytes
-      # load read instrution
-      paramList = []
-      paramList.append(int(offset_val))
-      ds = DSModifiers(na=1, offset=paramList[0])
-      #lrB1code.add(localReadX(dst=vgpr(lrB1Idx, numVgprRequiredPerVector), src=vgpr(lrB1Addr), ds=ds, comment=""))
-    
     tP["localReadOffset"] = kIdx % b2bgDepthU
     lrB1code, pack = self.b2bgemmPerformLocalRead2(kernel, tP, 0, 0, loadVgpr, lrB1Addr, 0)
-
     return lrB1code
-
-  def b2bgemmGlobalReadB1(self, kernel, addrVgprIdx, kIdx: int, sgprScalarOffset, vgprReadIncIdx: int) -> Tuple[Module, Module, int, int]:
-    '''
-    Iteration direction example for # of waves == 4 and wave tile = [1, 1]
-    /-------- MT1 == N1 --------\
-    |---------------------------| \                        |
-    | w0  |  w1  |  w2  |  w3   | miK        uIdx = 0      |
-    |---------------------------| /                        |
-    | w0  |  w1  |  w2  |  w3   |            uIdx = 1      |
-    |---------------------------|                         \|/
-    |                           |                          V
-    '''
-    module = Module("B2BGEMM Global Read")
-    wavelen = kernel["WavefrontSize"]
-    waveTileM, waveTileN = kernel["MIWaveTile"]
-    elemNumBytes = kernel["ProblemType"]["DataType"].numBytes()
-    vectorLen = kernel["MatrixInstK"]
-    numTotalDataFromB1 = kernel["MatrixInstK"] * kernel["MatrixInstN"] * kernel["MatrixInstB"] * elemNumBytes
-    numVgprRequiredPerVector = numTotalDataFromB1 // wavelen // 4
-    numBytesPerVectorLoad = numVgprRequiredPerVector * 4
-    numVectorsPerWave = waveTileM * waveTileN
-    numVgprs = numVectorsPerWave * numVgprRequiredPerVector
-    loadVgpr = self.vgprPool.checkOutAligned(numVgprs, 2)
-    instN = kernel["MatrixInstN"]
-    BM = kernel["MatrixInstBM"]
-    BN = kernel["MatrixInstBN"]
-    waveMT0, waveMT1 = kernel["MatrixInstM"] * BM, kernel["MatrixInstN"] * BN
-    waveGroupM, waveGroupN = kernel["MIWaveGroup"]
-    strideM, strideN = 1, waveMT1 * waveGroupN #since we assume MT1 == K1
-    for wn in range(waveTileN):
-      # vgprs layout |(n, 0)|(n, 1)|(n, 2)|(n, 3)|
-      vgprIdx = self.b2bgemmCalcInputVgprIdx(loadVgpr, numVgprRequiredPerVector, wn)
-      # The global read value will not exceed 1024 bytes, so we can use offset slot
-      if wn == 0:
-        module.add(self.chooseGlobalRead(True, numBytesPerVectorLoad, vgprIdx, vgpr(addrVgprIdx), sgpr("SrdB1", 4), 0, 0))
-      else:
-        module.add(self.chooseGlobalRead(True, numBytesPerVectorLoad, vgprIdx, vgpr(addrVgprIdx), sgpr("SrdB1", 4), sgpr(sgprScalarOffset + wn - 1), 0))
-
-    # GR inc
-    grIncode = Module()
-    miK = kernel["MatrixInstK"]
-    grIncode.add(VMovB32(dst=vgpr(vgprReadIncIdx), src=hex(miK * strideM * elemNumBytes)))
-    grIncode.add(VAddU32(dst=vgpr(addrVgprIdx), src0=vgpr(addrVgprIdx), src1=vgpr(vgprReadIncIdx), \
-                comment="Global read offset: miK * elemNumBytes"))
-    return module, grIncode, loadVgpr, numVgprs
-
-  def b2bgemmPerformLocalRead(self, kernel, tP, dstVgprIdx: int, packVgprIdx: int, srcVgprIdx: int, \
-                              elemNumBytes: int, srcRowMaj: bool) -> Tuple[Module, Module]:
-    assert srcRowMaj is False, "Currently, always assume LDS is col-major"
-    imod = Module("B2BGEMM LocalRead A1")
-    wavelen = kernel["WavefrontSize"]
-    numTotalDataFromA1 = kernel["MatrixInstK"] * kernel["MatrixInstM"] * kernel["MatrixInstB"] * elemNumBytes
-    numVgprRequiredPerVector = numTotalDataFromA1 // wavelen // 4
-    vectorLen = (numVgprRequiredPerVector * 4) // elemNumBytes
-
-    tc               = tP["tensorChar"]
-    lrvw             = vectorLen
-    tile01           = tP["tile01Idx"]
-    instruction      = tP["localReadInstruction"]
-
-    numOffsets       = instruction.numOffsets
-    blockWidth       = instruction.blockWidth
-    vectorWidth      = 1
-    vwB              = 1
-    MIWaveGroupShape = [ kernel["MatrixInstM"] * kernel["MatrixInstBM"] * kernel["MIWaveGroup"][0] * vectorWidth, \
-                          kernel["MatrixInstN"] * kernel["MatrixInstBN"] * kernel["MIWaveGroup"][1] * vwB]
-
-    LdsPad           = kernel["b2bGemmLdsAPad"]
-    tileStride       = 1
-    UnrollStride     = kernel["MacroTile%s" % tc] + LdsPad
-
-    numReadPerTileVector = vectorWidth if (tile01 == 0) else 1
-    numVectorsPerTile    = kernel["MIWaveTile"][tile01] // numReadPerTileVector
-    # overloading numReadsPerUnroll for DirectToLds x2/x4 case when blockWidth of instruction < LocalReadVectorWidth
-    # fp64 TLU=1 reading 0.5element/lane/read..
-    # for TLU=0 case, blockWidth and LRVW should match
-
-    numReadsPerUnroll = tP["bpe"] * lrvw // int(blockWidth * 4) # bytes/register
-    numVgpr  = int(ceil(blockWidth))
-
-    # pack register
-    needPack = blockWidth < 1
-    pack     = Module("pack")
-
-    valufIdx = 0
-    for vIdx in range(0, numVectorsPerTile):
-        for eIdx in range(0, numReadPerTileVector):
-            valuiIdx = int(valufIdx)
-            localReadCode = imod.add(Module("LocalRead%s Valu%u"%(tc,valuiIdx)))
-            if needPack:
-                packCode = pack.add(Module("packCode"))
-            for rIdx in range(0, numReadsPerUnroll):
-                valuiIdx = int(valufIdx)
-                baseLRVgpr = vgpr(dstVgprIdx + valuiIdx, numVgpr)
-                destVgpr = baseLRVgpr
-
-                # pack for blockWidth 0.5 type
-                highBitsForHalf = (blockWidth == 0.5) and ((rIdx % 2) == 1) # rIdx = 1
-                if needPack and highBitsForHalf:
-                    # highVgpr = vgpr(tmpVgprIdx + valuiIdx)
-                    highVgpr = vgpr(packVgprIdx)
-                    packVgprIdx += 1
-                    packCode.add(VOrB32(dst=destVgpr, src0=destVgpr, src1=highVgpr, comment="pack two half Vgpr to one Vgpr"))
-                    destVgpr = highVgpr
-
-                isHigh8Bits  = (blockWidth == 0.25) and ( ((rIdx % 4) % 2) == 1) # 1,3
-                isHigh16Bits = (blockWidth == 0.25) and ( ((rIdx % 4) //2) == 1) # 2,3
-                if needPack:
-                    if isHigh8Bits or isHigh16Bits:
-                        highVgpr = vgpr(packVgprIdx)
-                        destVgpr = highVgpr
-                    if isHigh8Bits:
-                        lowVgpr = vgpr(packVgprIdx-1) if isHigh16Bits else baseLRVgpr
-                        packCode.add(VLShiftLeftOrB32(dst=lowVgpr, src0=highVgpr, shiftHex=hex(0x8), src1=lowVgpr, comment="pack two int8 Vgpr to one half Vgpr"))
-                        if isHigh16Bits:
-                            packCode.add(VOrB32(dst=baseLRVgpr, src0=baseLRVgpr, src1=lowVgpr, comment="pack two half Vgpr to one Vgpr"))
-                    if isHigh8Bits or isHigh16Bits:
-                        packVgprIdx += 1
-
-                valufIdx += blockWidth
-
-                # load read instrution
-                paramList = []
-
-                for oIdx in range(0, numOffsets):
-                    # normal case
-                    offset_val = (eIdx + (vIdx * numOffsets+oIdx) * MIWaveGroupShape[tile01]) * tileStride
-                    offset_val = (rIdx * UnrollStride + offset_val + tP["localReadOffset"]) * tP["bpe"]
-                    offset_val = offset_val + tP["localReadSwapByteOffset"]
-                    # offset_val = offset_val + scalarOffset
-                    paramList.append(int(offset_val))
-
-                comment = "L -> Reg lro=%d swapByteOffset=%u ti=%u vIdx=%u rIdx=%u oIdx=%u buffer=%u iui=%u" \
-                        % (tP["localReadOffset"], tP["localReadSwapByteOffset"], MIWaveGroupShape[tile01], vIdx, rIdx, oIdx, 0, 0)
-
-                highBits = highBitsForHalf or isHigh16Bits
-
-                if numOffsets == 1:
-                    ds = DSModifiers(na=1, offset=paramList[0])
-                else:
-                    ds = DSModifiers(na=2, offset0=paramList[0], offset1=paramList[1])
-                localReadX = instruction.getInst(highBits)
-                localReadCode.add(localReadX(dst=destVgpr, src=vgpr(srcVgprIdx), ds=ds, comment=comment))
-    return imod, pack
-          
+ 
   def b2bgemmPerformLocalRead2(self, kernel, tP, bufferIdx: int, iui: int, prefix="", addr=0, pk=0) -> Tuple[Module, Module]:
       def vgprPrefixPerm(dNum, *args):
           if isinstance(args[0], int):
@@ -8852,30 +8676,18 @@ class KernelWriterAssembly(KernelWriter):
     module = Module()
     waveTileM, waveTileN = kernel["MIWaveTile"]
     elemNumBytes = kernel["ProblemType"]["DataType"].numBytes()
-    wavelen = kernel["WavefrontSize"]
-
-    numTotalDataFromA1 = kernel["MatrixInstK"] * kernel["MatrixInstM"] * kernel["MatrixInstB"] * elemNumBytes
-    numVgprRequiredPerVector = numTotalDataFromA1 // wavelen // 4
-    vectorLen = (numVgprRequiredPerVector * 4) // elemNumBytes
 
     BM = kernel["MatrixInstBM"]
     BN = kernel["MatrixInstB"] // BM
     waveMT0, waveMT1 = kernel["MatrixInstM"] * BM, kernel["MatrixInstN"] * BN
     ldsPad = kernel["b2bGemmLdsAPad"]
     waveGroupM, waveGroupN = kernel["MIWaveGroup"]
-    strideM, strideN = 1, (waveMT0 * waveGroupM * waveTileM) + ldsPad#since we assume MT1 == K1
+    strideN = (waveMT0 * waveGroupM * waveTileM) + ldsPad #since we assume MT1 == K1
     packs = []
 
-    for wm in range(1):#range(waveTileM):
-      # vgprs layout |(m, 0)|(m, 1)|(m, 2)|(m, 3)|
-      vgprIdx = self.b2bgemmCalcInputVgprIdx(loadVgpr, numVgprRequiredPerVector, wm)
-      waveTileOffset = wm * strideM # in element
-      waveTileOffsetBytes = waveTileOffset * elemNumBytes
-      scalarOffset = kIdx * strideN * elemNumBytes
-      #lr, pack = self.b2bgemmPerformLocalRead(kernel, tP, vgprIdx, packVgpr, rowVgprIdx, elemNumBytes, False)
-      lr, pack = self.b2bgemmPerformLocalRead2(kernel, tP, 0, (kIdx % kernel["b2bGemmDepthU"]) // kernel["MatrixInstK"], vgprIdx, rowVgprIdx, packVgpr)
-      module.add(lr)
-      packs.append(pack)
+    lr, pack = self.b2bgemmPerformLocalRead2(kernel, tP, 0, (kIdx % kernel["b2bGemmDepthU"]) // kernel["MatrixInstK"], loadVgpr, rowVgprIdx, packVgpr)
+    module.add(lr)
+    packs.append(pack)
 
     # LR inc
     miK = kernel["MatrixInstK"]
@@ -9184,7 +8996,6 @@ class KernelWriterAssembly(KernelWriter):
 
   def b2bgemmMatmul(self, kernel, a: int, b: int, miM: int, miN: int, miK: int) -> Tuple[Module, int]:
     elemNumBytes = kernel["ProblemType"]["DataType"].numBytes()
-    vectorLen = miK
     wavelen = kernel["WavefrontSize"]
 
     numTotalDataFromB1 = kernel["MatrixInstK"] * kernel["MatrixInstN"] * kernel["MatrixInstB"] * elemNumBytes
