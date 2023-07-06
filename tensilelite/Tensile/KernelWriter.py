@@ -1899,8 +1899,8 @@ class KernelWriter(metaclass=abc.ABCMeta):
 
     # final offsets
     lralwaMod.addComment1("local read addresses: final offsets a")
-    lralwaMod.add(self.lraFinalOffset(kernel, tensorParametersA))
-    if kernel["ProblemType"]["SparseA"] and not kernel["DirectToVgprSparseMetadata", ""]:
+    lralwaMod.add(self.lraFinalOffset(kernel, tensorParametersA, ""))
+    if kernel["ProblemType"]["SparseA"] and not kernel["DirectToVgprSparseMetadata"]:
       lralwaMod.addComment1("local read addresses: final offsets metadata")
       lralwaMod.add(self.lraFinalOffset(kernel, tensorParametersA["tpsMetadata"], ""))
     lralwaMod.addComment1("local read addresses: final offsets b")
@@ -1913,7 +1913,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
       lralwaMod.addComment1("local read addresses: declare addresses metadata")
       lralwaMod.add(self.lraDeclareAddresses(kernel, tensorParametersA["tpsMetadata"]))
     lralwaMod.addComment1("local read addresses: declare addresses b")
-    lralwaMod.add(self.lraDeclareAddresses(kernel, tensorParametersB))
+    lralwaMod.add(self.lraDeclareAddresses(kernel, tensorParametersB,))
 
 
     ####################################

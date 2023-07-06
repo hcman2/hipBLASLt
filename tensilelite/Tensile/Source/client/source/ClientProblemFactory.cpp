@@ -282,7 +282,7 @@ namespace Tensile
                     rv.back().setFp16AltImpl(m_fp16AltImpl);
                     rv.back().setWorkspaceSize(m_maxWorkspaceSize);
                     rv.back().setActivationHPA(m_activationHPA);
-                    rv.back().setScaleD(m_constantTypes[ContractionProblemGemm::CONST::ALPHA],
+                    rv.back().setScaleDVec(m_constantTypes[ContractionProblemGemm::CONST::ALPHA],
                                         rv.back().d().sizes()[0]);
                     rv.back().setGroupedGemm(m_groupedGemm);
                     rv.back().setB2BGemm(m_b2bGemm);
@@ -293,7 +293,7 @@ namespace Tensile
                     rv.back().setActivationType(ActivationType::None);
                     rv.back().setBias(DataType::None, 0);
                     rv.back().setActivationType(ActivationType::None);
-                    rv.back().setUseScaleD(false);
+                    rv.back().setUseScaleDVec(false);
 
                     //2nd Gemm
                     aStrides[1] = N;
@@ -357,8 +357,8 @@ namespace Tensile
                         rv.back().setActivationType(m_activationType);
                     }
                     rv.back().setActivationHPA(m_activationHPA);
-                    rv.back().setUseScaleD(m_useScaleD);
-                    rv.back().setScaleD(m_constantTypes[ContractionProblemGemm::CONST::ALPHA],
+                    rv.back().setUseScaleDVec(m_useScaleDVec);
+                    rv.back().setScaleDVec(m_constantTypes[ContractionProblemGemm::CONST::ALPHA],
                                         rv.back().d().sizes()[0]);
 
                     rv.back().setGroupedGemm(m_groupedGemm);

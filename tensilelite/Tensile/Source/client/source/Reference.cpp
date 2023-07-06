@@ -823,8 +823,8 @@ namespace Tensile
             }
         }
 
-        template <typename Inputs, typename Accumulator>
-        void ReferenceSolution<Inputs, Accumulator>::SolveCPU(
+        template <typename Inputs, typename Accumulator, typename MathOpAccum>
+        void ReferenceSolution<Inputs, Accumulator, MathOpAccum>::SolveCPU(
             ContractionProblemB2BGemm const& problem,
             ContractionGroupedInputs const&  inputs,
             size_t                           elementsToValidate)
