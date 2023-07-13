@@ -98,6 +98,7 @@ Arguments:
   - initialization: hipblaslt_initialization
   - pad: c_uint32
   - grouped_gemm: c_int32
+  - b2b_gemm: c_bool
   - threads: c_uint16
   - streams: c_uint16
   - devices: c_uint8
@@ -196,6 +197,7 @@ Defaults:
   bias_vector: false
   scaleD_vector: false
   grouped_gemm: 0
+  b2b_gemm: false
   norm_check_assert: true
   use_ext: false
   use_ext_setproblem: false

@@ -269,6 +269,7 @@ namespace
                                      float                  alpha,
                                      float                  beta,
                                      bool                   isGroupedGemm,
+                                     bool                   isB2BGemm,
                                      size_t                 maxWorkspaceBytes)
     {
         return Tensile::ContractionProblemGemm::createDefaultProblem((opA != HIPBLAS_OP_N),
@@ -283,6 +284,7 @@ namespace
                                                                      alpha,
                                                                      beta,
                                                                      isGroupedGemm,
+                                                                     isB2BGemm,
                                                                      maxWorkspaceBytes);
     }
 
@@ -409,6 +411,7 @@ namespace
         // set batch mode
         tensileProblem.setStridedBatched(prob.strided_batch);
         tensileProblem.setGroupedGemm(prob.grouped_gemm);
+        tensileProblem.setB2BGemm(prob.b2b_gemm);
 
         // alpha and beta are stored by value in Tensile::TypedContractionInputs
         // alpha and beta are copied from host to Tensile::TypedContractionInputs
@@ -518,6 +521,10 @@ namespace
             freeIndex[0].i  = 0;
             boundIndex[0].a = 1;
         }
+        std::cout<<"[B2BGEMM] "<<__func__<<",  prob.row_stride_a "<<prob.row_stride_a<<std::endl;
+        std::cout<<"[B2BGEMM] "<<__func__<<",  prob.col_stride_a "<<prob.col_stride_a<<std::endl;
+        std::cout<<"[B2BGEMM] "<<__func__<<",  prob.batch_stride_a "<<prob.batch_stride_a<<std::endl;
+
 
         // If B is transposed, swap the free and bound dimensions and their ranks
         if(prob.trans_b != HIPBLAS_OP_N)
@@ -565,6 +572,7 @@ namespace
         // set batch mode
         tensileProblem.setStridedBatched(prob.strided_batch);
         tensileProblem.setGroupedGemm(prob.grouped_gemm);
+        tensileProblem.setB2BGemm(prob.b2b_gemm);
 
         // alpha and beta are stored by value in Tensile::TypedContractionInputs
         // alpha and beta are copied from host to Tensile::TypedContractionInputs
@@ -1023,6 +1031,13 @@ struct TensileDataGroupedGemm
     size_t                                 hipHostMemorySize;
 };
 
+struct TensileDataB2BGemm
+{
+    Tensile::ContractionProblemB2BGemm     problem;
+    Tensile::ContractionGroupedInputs      inputs;
+    std::vector<Tensile::KernelInvocation> kernels;
+};
+
 void initTensileGemmData(rocblaslt_handle       handle,
                          rocblaslt::RocGemmType gemmType,
                          hipblasOperation_t     opA,
@@ -1035,6 +1050,7 @@ void initTensileGemmData(rocblaslt_handle       handle,
                          size_t                 maxWorkspaceBytes,
                          std::shared_ptr<void>& gemmData)
 {
+    std::cout<<"[B2BGEMM] "<<__func__<<std::endl;
     float alpha = 1.0;
     float beta  = 1.0;
     if(gemmType == rocblaslt::RocGemmType::ROCBLASLT_GEMM)
@@ -1049,6 +1065,7 @@ void initTensileGemmData(rocblaslt_handle       handle,
                                             typeCompute,
                                             alpha,
                                             beta,
+                                            false,
                                             false,
                                             maxWorkspaceBytes);
         gemmData     = std::static_pointer_cast<void>(std::make_shared<TensileDataGemm>(data));
@@ -1070,6 +1087,7 @@ void initTensileGemmData(rocblaslt_handle       handle,
                                                            alpha,
                                                            beta,
                                                            true,
+                                                           false,
                                                            maxWorkspaceBytes));
         groupedInputs.grouped.resize(1);
 
@@ -1080,6 +1098,29 @@ void initTensileGemmData(rocblaslt_handle       handle,
         data.hipHostMemorySize = INTERNAL_HIPHOSTMEM_SIZE;
 
         gemmData = std::static_pointer_cast<void>(std::make_shared<TensileDataGroupedGemm>(data));
+        return;
+    }
+    else if(gemmType == rocblaslt::RocGemmType::ROCBLASLT_B2B_GEMM)
+    {
+        std::cout<<"[B2BGEMM] initTensileGemmData ROCBLASLT_B2B_GEMM"<<std::endl;
+        TensileDataB2BGemm data;
+        Tensile::ContractionProblemB2BGemm& tensile_probs = data.problem;
+        Tensile::ContractionGroupedInputs&  groupedInputs = data.inputs;
+        groupedInputs.grouped.resize(2);
+        tensile_probs.gemms.resize(2);
+        tensile_probs.gemms[0] = CreateTensileProblem(opA,
+                                                           opB,
+                                                           typeA,
+                                                           typeB,
+                                                           typeC,
+                                                           typeD,
+                                                           typeCompute,
+                                                           alpha,
+                                                           beta,
+                                                           false,
+                                                           true,
+                                                           maxWorkspaceBytes);
+        gemmData     = std::static_pointer_cast<void>(std::make_shared<TensileDataB2BGemm>(data));
         return;
     }
 
@@ -1287,6 +1328,89 @@ rocblaslt_status groupedGemmCreate(std::vector<RocblasltContractionProblem<Ti, T
     return status;
 }
 
+template <typename Ti, typename To, typename Tc>
+rocblaslt_status b2bGemmCreate(RocblasltContractionProblem<Ti, To, Tc> const& problem1,
+                               RocblasltContractionProblem<Ti, To, Tc> const& problem2,
+                               std::shared_ptr<void>&                         gemmData,
+                               size_t&                                        gemmCount)
+{
+    std::cout<<"[B2BGEMM] "<<__func__<<std::endl;
+    rocblaslt_status status = rocblaslt_status_internal_error;
+    try
+    {
+        // Check if pointer is valid
+        if(problem1.alpha == nullptr || problem1.beta == nullptr || problem1.A == nullptr
+           || problem1.B == nullptr || problem1.C == nullptr || problem1.D == nullptr)
+        {
+            log_error(__func__, "invalid data pointer");
+            return rocblaslt_status_invalid_pointer;
+        }
+        if(problem2.alpha == nullptr || problem2.beta == nullptr || problem2.A == nullptr
+           || problem2.B == nullptr || problem2.C == nullptr || problem2.D == nullptr)
+        {
+            log_error(__func__, "invalid data pointer");
+            return rocblaslt_status_invalid_pointer;
+        }
+        gemmCount = 1;
+        if(gemmData)
+        {
+            std::cout<<"[B2BGEMM] gemmData"<<std::endl;
+            //auto problem2 = problem;
+            //auto problem1 = problem;
+            std::shared_ptr<TensileDataB2BGemm> data
+                = std::static_pointer_cast<TensileDataB2BGemm>(gemmData);
+            std::cout<<"[B2BGEMM] gemmData static_pointer_cast"<<std::endl;
+            Tensile::ContractionProblemB2BGemm&     tensile_probs = data->problem;
+            std::cout<<"[B2BGEMM] gemmData tensile_probs"<<std::endl;
+            Tensile::ContractionGroupedInputs&      groupedInputs = data->inputs;
+            groupedInputs.grouped.clear();
+            std::cout<<"[B2BGEMM] gemmData groupedInputs "<<groupedInputs.grouped.size()<<std::endl;
+            //groupedInputs.grouped.clear();
+            std::cout<<"[B2BGEMM] gemmData clear"<<std::endl;
+            //re-arrange 1st gemm
+            std::cout<<"[B2BGEMM] gemmData 1st gemm"<<std::endl;
+            updateTensileProblem(true, problem1, tensile_probs.gemms[0]);
+            std::cout<<"[B2BGEMM] actType "<<tensile_probs.gemms[0].activationType()<<std::endl;
+            groupedInputs.grouped.push_back(GetTensileInputs(problem1));
+            //re-arrange 2nd gemm
+            std::cout<<"[B2BGEMM] gemmData 2nd gemm"<<std::endl;
+            updateTensileProblem(false, problem2, tensile_probs.gemms[1]);
+            groupedInputs.grouped.push_back(GetTensileInputs(problem2));
+            std::cout<<"[B2BGEMM] Create done"<<std::endl;
+        }
+        else
+        {
+            std::cout<<"[B2BGEMM] !gemmData"<<std::endl;
+            TensileDataB2BGemm data;
+            Tensile::ContractionProblemB2BGemm&     tensile_probs = data.problem;
+            Tensile::ContractionGroupedInputs&      groupedInputs = data.inputs;
+            //data.problem = ConstructTensileProblem(problem);
+            //data.inputs  = GetTensileInputs(problem);
+
+            gemmData = std::static_pointer_cast<void>(std::make_shared<TensileDataB2BGemm>(data));
+        }
+        status = rocblaslt_status_success;
+    }
+    catch(const std::exception& e)
+    {
+#if 0
+        std::ostream msg;
+        print_once(msg << "\nrocblaslt error: " << (solution ? "" : "No ")
+                       << "Tensile solution found, but exception thrown for " << prob << e.what());
+#endif
+    }
+    catch(...)
+    {
+#if 0
+        std::ostream msg;
+        print_once(msg << "\nrocblaslt error: " << (solution ? "" : "No ")
+                       << "Tensile solution found, but unknown exception thrown for " << prob);
+#endif
+    }
+
+    return status;
+}
+
 rocblaslt_status makeArgument(rocblaslt_handle             handle,
                               const rocblaslt::RocGemmType gemmType,
                               const rocblaslt_matmul_algo& algo,
@@ -1389,6 +1513,16 @@ rocblaslt_status makeArgument(rocblaslt_handle             handle,
                 data->problem.gemms[i].setUseScaleDVec(useScaleDVec[i]);
             }
         }
+        else if(gemmType == rocblaslt::RocGemmType::ROCBLASLT_B2B_GEMM)
+        {
+            std::shared_ptr<TensileDataB2BGemm> data
+                = std::static_pointer_cast<TensileDataB2BGemm>(gemmData);
+            auto solution = library->getSolutionByIndex(data->problem.gemms[0], *hardware, *solutionIndex);
+            data->kernels = solution->solveB2BGemm(data->problem.gemms, data->inputs, *hardware,
+                                                       nullptr,
+                                                       0,
+                                                       stream);
+        }
         status = rocblaslt_status_success;
     }
     catch(const std::exception& e)
@@ -1435,6 +1569,12 @@ rocblaslt_status runKernelFromInvocation(rocblaslt_handle       handle,
         {
             std::shared_ptr<TensileDataGroupedGemm> data
                 = std::static_pointer_cast<TensileDataGroupedGemm>(gemmData);
+            static_cast<void>(adapter->launchKernels(data->kernels, stream, nullptr, nullptr));
+        }
+        else if(gemmType == rocblaslt::RocGemmType::ROCBLASLT_B2B_GEMM)
+        {
+            std::shared_ptr<TensileDataB2BGemm> data
+                = std::static_pointer_cast<TensileDataB2BGemm>(gemmData);
             static_cast<void>(adapter->launchKernels(data->kernels, stream, nullptr, nullptr));
         }
         else
@@ -1505,6 +1645,7 @@ inline auto getSolutions(
     const int&                                requestedAlgoCount,
     int&                                      fallbackSize)
 {
+    std::cout<<"[B2BGEMM] "<<__func__<<std::endl;
     const void *scaleDVec = nullptr, *bias = nullptr, *E = nullptr;
     if constexpr(std::is_same<T, Tensile::ContractionInputs>::value)
     {
@@ -1883,6 +2024,11 @@ rocblaslt_status isSolutionSupported(rocblaslt_handle       handle,
         }
         *workspaceSizeInBytes = tmpWorkspaceSize;
     }
+    else if constexpr(std::is_same<MyProblem, Tensile::ContractionProblemB2BGemm>::value)
+    {
+        log_error(__func__, "B2BGEMM is not supported");
+        return rocblaslt_status_invalid_value;
+    }
     return rocblaslt_status_success;
 }
 
@@ -1948,6 +2094,10 @@ rocblaslt_status isSolutionSupported(rocblaslt_handle              handle,
         return isSolutionSupported(
             handle, data->problem, data->inputs, &algo, &workspaceSizeInBytes);
     }
+    else if(gemmType == rocblaslt::RocGemmType::ROCBLASLT_B2B_GEMM)
+    {
+        std::cout<<"FIXME: ROCBLASLT_B2B_GEMM not ready"<<std::endl;
+    }
     return rocblaslt_status_not_implemented;
 }
 
@@ -1958,6 +2108,7 @@ rocblaslt_status getBestSolutions(rocblaslt_handle       handle,
                                   const int              requestedAlgoCount,
                                   std::vector<rocblaslt_matmul_heuristic_result>& heuristicResults)
 {
+    std::cout<<"[B2BGEMM] "<<__func__<<std::endl;
     std::shared_ptr<Tensile::MasterSolutionLibrary<Tensile::ContractionProblemGemm>> library;
     std::shared_ptr<hipDeviceProp_t>                                                 deviceProp;
     std::shared_ptr<Tensile::Hardware>                                               hardware;
@@ -2059,7 +2210,32 @@ rocblaslt_status getBestSolutions(rocblaslt_handle       handle,
                                        data->problem.gemms[0],
                                        0);
     }
-
+    else if(gemmType == rocblaslt::RocGemmType::ROCBLASLT_B2B_GEMM)
+    {
+        std::shared_ptr<TensileDataB2BGemm> data
+            = std::static_pointer_cast<TensileDataB2BGemm>(gemmData);
+        int fallbackSize = 0;
+        bool isb2b = data->problem.gemms[0].b2bGemm();
+        if(isb2b)
+        {
+            std::cout<<"[B2BGEMM] isb2b"<<std::endl;
+            std::cout<<"[B2BGEMM] actType: "<< data->problem.gemms[0].activationType() <<std::endl;
+        }
+        auto solutions = library->findTopSolutions(
+            data->problem.gemms[0], *hardware, requestedAlgoCount);
+        std::cout<<"[B2BGEMM] findTopSolutions "<<solutions.size()<<std::endl;
+        auto algoCount       = min(requestedAlgoCount, solutions.size());
+        int  returnAlgoCount = 0;
+        heuristicResults.clear();
+        heuristicResults.resize(algoCount);
+        _convertToHeuristicResultArray(solutions,
+                                       algoCount,
+                                       heuristicResults.data(),
+                                       &returnAlgoCount,
+                                       workspaceBytes,
+                                       data->problem.gemms[0],
+                                       fallbackSize);
+    }
     return rocblaslt_status_success;
 }
 /***************************************************************
@@ -2089,6 +2265,9 @@ extern "C" void rocblaslt_createialize()
                                          size_t&                gemmCount);                                         \
     template rocblaslt_status groupedGemmCreate<Ti, To, Tc>(                                         \
         std::vector<RocblasltContractionProblem<Ti, To, Tc>>&, std::shared_ptr<void>&, size_t&);     \
+    template rocblaslt_status b2bGemmCreate<Ti, To, Tc>(                                             \
+        RocblasltContractionProblem<Ti, To, Tc> const& problem1,                                     \
+        RocblasltContractionProblem<Ti, To, Tc> const& problem2, std::shared_ptr<void>&, size_t&);   \
     template rocblaslt_status getAllSolutions(                                                       \
         RocblasltContractionProblem<Ti, To, Tc>&        prob,                                        \
         rocblaslt_handle                                handle,                                      \

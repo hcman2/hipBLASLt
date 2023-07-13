@@ -436,6 +436,10 @@ try
          value<int32_t>(&arg.grouped_gemm)->default_value(0),
          "Use grouped_gemm if non-zero. Number of gemms to run")
 
+         ("b2b_gemm",
+         value<bool>(&arg.b2b_gemm)->default_value(false),
+         "Enable b2b_gemm.")
+
         ("device",
          value<int>(&device_id)->default_value(0),
          "Set default device to be used for subsequent program runs")

@@ -83,6 +83,7 @@ namespace hipblaslt_ext
     try
     {
         auto gemmType = static_cast<rocblaslt::RocGemmType>(m_gemm_type);
+        std::cout<<"gemmType is "<<static_cast<int>(gemmType)<<std::endl;
         auto rocalgo  = reinterpret_cast<rocblaslt_matmul_algo*>(&algo);
         return RocBlasLtStatusToHIPStatus(rocblaslt_is_algo_supported_cpp(
             (rocblaslt_handle)m_handle, gemmType, m_data, *rocalgo, workspaceSizeInBytes));
@@ -491,6 +492,178 @@ namespace hipblaslt_ext
         return exception_to_hipblas_status();
     }
 
+    HIPBLASLT_EXPORT B2BGemm::B2BGemm(hipblasLtHandle_t      handle,
+                                      hipblasOperation_t     opA,
+                                      hipblasOperation_t     opB,
+                                      hipblasOperation_t     opB1,
+                                      hipblasDatatype_t      typeA,
+                                      hipblasDatatype_t      typeB,
+                                      hipblasDatatype_t      typeB1,
+                                      hipblasDatatype_t      typeC,
+                                      hipblasDatatype_t      typeD,
+                                      hipblasLtComputeType_t typeCompute)
+        : GemmInstance(handle, GemmType::HIPBLASLT_B2B_GEMM)
+    {
+        std::cout<< "[B2BGEMM] B2BGemm rocblaslt_init_gemmData" <<std::endl;
+        m_problem_types.push_back({opA, opB, typeA, typeB, typeC, typeD, typeCompute});
+        rocblaslt_init_gemmData((rocblaslt_handle)m_handle,
+                                static_cast<rocblaslt::RocGemmType>(m_gemm_type),
+                                opA,
+                                opB,
+                                typeA,
+                                typeB,
+                                typeC,
+                                typeD,
+                                (rocblaslt_compute_type)typeCompute,
+                                0,
+                                m_data);
+    }
+
+    HIPBLASLT_EXPORT B2BGemm::B2BGemm(hipblasLtHandle_t       handle,
+                                      hipblasLtMatmulDesc_t   matmul_descr,
+                                      const void*             alpha,
+                                      const void*             A,
+                                      hipblasLtMatrixLayout_t matA,
+                                      const void*             B,
+                                      hipblasLtMatrixLayout_t matB,
+                                      const void*             B1,
+                                      hipblasLtMatrixLayout_t matB1,
+                                      const void*             beta,
+                                      const void*             C,
+                                      hipblasLtMatrixLayout_t matC,
+                                      void*                   D,
+                                      hipblasLtMatrixLayout_t matD)
+        : GemmInstance(handle, GemmType::HIPBLASLT_B2B_GEMM)
+    {
+        std::cout<< "[B2BGEMM] B2BGemm setProblem" <<std::endl;
+        auto status = setProblem(matmul_descr, alpha, A, matA, B, matB, B1, matB1, beta, C, matC, D, matD);
+        if(status != HIPBLAS_STATUS_SUCCESS)
+        {
+            std::cout << "Failed to create instance " << status << std::endl;
+        }
+    }
+
+    hipblasStatus_t B2BGemm::setProblem(int64_t       m,
+                                        int64_t       n,
+                                        int64_t       k,
+                                        int64_t       batch_count,
+                                        GemmEpilogue& epilogue,
+                                        GemmInputs&   inputs)
+    {
+        int lda      = m_problem_types[0].op_a == HIPBLAS_OP_N ? m : k;
+        int ldb      = m_problem_types[0].op_b == HIPBLAS_OP_N ? k : n;
+        int ldc      = m;
+        int ldb1     = n;
+        int strideA  = m * k;
+        int strideB  = n * k; 
+        int strideC  = m * n;
+        int strideB1 = n * n;
+        return setProblem(m,
+                          n,
+                          k,
+                          batch_count,
+                          lda,
+                          ldb,
+                          ldb1,
+                          ldc,
+                          ldc,
+                          strideA,
+                          strideB,
+                          strideB1,
+                          strideC,
+                          strideC,
+                          epilogue,
+                          inputs,
+                          m_problem_types[0]);
+    }
+
+    hipblasStatus_t B2BGemm::setProblem(int64_t          m,
+                                        int64_t          n,
+                                        int64_t          k,
+                                        int64_t          batch_count,
+                                        int64_t          lda,
+                                        int64_t          ldb,
+                                        int64_t          ldb1,
+                                        int64_t          ldc,
+                                        int64_t          ldd,
+                                        int64_t          strideA,
+                                        int64_t          strideB,
+                                        int64_t          strideB1,
+                                        int64_t          strideC,
+                                        int64_t          strideD,
+                                        GemmEpilogue&    epilogue,
+                                        GemmInputs&      inputs,
+                                        GemmProblemType& problemtype)
+    {
+        auto rocepilogue    = reinterpret_cast<rocblaslt::RocGemmEpilogue*>(&epilogue);
+        auto rocepinputs    = reinterpret_cast<rocblaslt::RocGemmInputs*>(&inputs);
+        auto rocproblemtype = reinterpret_cast<rocblaslt::RocGemmProblemType*>(&problemtype);
+        auto status         = RocBlasLtStatusToHIPStatus(rocblaslt_b2bgemm_create_cpp(m,
+                                                                           n,
+                                                                           batch_count,
+                                                                           k,
+                                                                           lda,
+                                                                           ldb,
+                                                                           ldb1,
+                                                                           ldc,
+                                                                           ldd,
+                                                                           strideA,
+                                                                           strideB,
+                                                                           strideB1,
+                                                                           strideC,
+                                                                           strideD,
+                                                                           *rocepilogue,
+                                                                           *rocepinputs,
+                                                                           *rocproblemtype,
+                                                                           m_data,
+                                                                           m_gemm_count));
+        if(status == HIPBLAS_STATUS_SUCCESS)
+        {
+            m_problem_types[0] = problemtype;
+        }
+        return status;
+    }
+
+    hipblasStatus_t B2BGemm::setProblem(hipblasLtMatmulDesc_t   matmul_descr,
+                                        const void*             alpha,
+                                        const void*             A,
+                                        hipblasLtMatrixLayout_t matA,
+                                        const void*             B,
+                                        hipblasLtMatrixLayout_t matB,
+                                        const void*             B1,
+                                        hipblasLtMatrixLayout_t matB1,
+                                        const void*             beta,
+                                        const void*             C,
+                                        hipblasLtMatrixLayout_t matC,
+                                        void*                   D,
+                                        hipblasLtMatrixLayout_t matD)
+    {
+        auto rocproblemtypes
+            = reinterpret_cast<std::vector<rocblaslt::RocGemmProblemType>*>(&m_problem_types);
+        return RocBlasLtStatusToHIPStatus(
+            rocblaslt_b2bgemm_create_cpp((rocblaslt_matmul_desc)matmul_descr,
+                                          alpha,
+                                          A,
+                                          (rocblaslt_matrix_layout)matA,
+                                          B,
+                                          (rocblaslt_matrix_layout)matB,
+                                          B1,
+                                          (rocblaslt_matrix_layout)matB1,
+                                          beta,
+                                          C,
+                                          (rocblaslt_matrix_layout)matC,
+                                          D,
+                                          (rocblaslt_matrix_layout)matD,
+                                          (*rocproblemtypes)[0],
+                                          m_data,
+                                          m_gemm_count));
+    }
+    
+    GemmProblemType B2BGemm::getProblemTypes()
+    {
+        return m_problem_types[0];
+    }
+
     std::string gemmType2String(GemmType type)
     {
         switch(type)
@@ -499,6 +672,8 @@ namespace hipblaslt_ext
             return "gemm";
         case GemmType::HIPBLASLT_GROUPED_GEMM:
             return "grouped gemm";
+        case GemmType::HIPBLASLT_B2B_GEMM:
+            return "b2b gemm";
         }
     }
 

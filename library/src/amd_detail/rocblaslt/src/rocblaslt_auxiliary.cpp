@@ -105,6 +105,7 @@ RocblasltContractionProblem<Ti, To, Tc>
     // Others
     constexpr bool strided_batch = true;
     constexpr bool grouped_gemm  = false;
+    constexpr bool b2b_gemm      = false;
 
     RocblasltContractionProblem<Ti, To, Tc> problem{opA,
                                                     opB,
@@ -136,6 +137,7 @@ RocblasltContractionProblem<Ti, To, Tc>
                                                     num_batches_a,
                                                     strided_batch,
                                                     grouped_gemm,
+                                                    b2b_gemm,
                                                     gradient,
                                                     compute_type,
                                                     bias,
@@ -1330,6 +1332,11 @@ rocblaslt_status rocblaslt_matmul_get_all_algos_cpp(
                         status = getAllSolutions<float, float, float>(
                             probs, handle, heuristicResults, maxWorkspaceSize);
                     }
+                    else if(typeGemm == rocblaslt::RocGemmType::ROCBLASLT_B2B_GEMM)
+                    {
+                        status = getAllSolutions<float, float, float>(
+                            prob, handle, heuristicResults, maxWorkspaceSize);
+                    }
                     else
                     {
                         log_api(__func__, "Invalid gemm type", static_cast<int>(typeGemm));
@@ -1361,6 +1368,11 @@ rocblaslt_status rocblaslt_matmul_get_all_algos_cpp(
                         status    = getAllSolutions<rocblaslt_half, rocblaslt_half, float>(
                             probs, handle, heuristicResults, maxWorkspaceSize);
                     }
+                    else if(typeGemm == rocblaslt::RocGemmType::ROCBLASLT_B2B_GEMM)
+                    {
+                        status = getAllSolutions<rocblaslt_half, rocblaslt_half, float>(
+                            prob, handle, heuristicResults, maxWorkspaceSize);
+                    }
                     else
                     {
                         log_api(__func__, "Invalid gemm type", static_cast<int>(typeGemm));
@@ -1387,6 +1399,11 @@ rocblaslt_status rocblaslt_matmul_get_all_algos_cpp(
                             = {prob};
                         status = getAllSolutions<rocblaslt_half, float, float>(
                             probs, handle, heuristicResults, maxWorkspaceSize);
+                    }
+                    else if(typeGemm == rocblaslt::RocGemmType::ROCBLASLT_B2B_GEMM)
+                    {
+                        status = getAllSolutions<rocblaslt_half, float, float>(
+                            prob, handle, heuristicResults, maxWorkspaceSize);
                     }
                     else
                     {
@@ -1421,6 +1438,11 @@ rocblaslt_status rocblaslt_matmul_get_all_algos_cpp(
                             probs = {prob};
                         status    = getAllSolutions<rocblaslt_bfloat16, rocblaslt_bfloat16, float>(
                             probs, handle, heuristicResults, maxWorkspaceSize);
+                    }
+                    else if(typeGemm == rocblaslt::RocGemmType::ROCBLASLT_B2B_GEMM)
+                    {
+                        status = getAllSolutions<rocblaslt_bfloat16, rocblaslt_bfloat16, float>(
+                            prob, handle, heuristicResults, maxWorkspaceSize);
                     }
                     else
                     {
@@ -1488,6 +1510,7 @@ rocblaslt_status
                                      const int              requestedAlgoCount,
                                      std::vector<rocblaslt_matmul_heuristic_result>& results)
 {
+    std::cout<<"[B2BGEMM] "<<__func__<<std::endl;
     if(requestedAlgoCount < 1)
     {
         log_error(__func__, "invalid requested count", requestedAlgoCount);
@@ -1496,6 +1519,7 @@ rocblaslt_status
     rocblaslt_status status = rocblaslt_status_success;
     try
     {
+        std::cout<<"[B2BGEMM] try getBestSolutions"<<std::endl;
         status = getBestSolutions(
             handle, gemmType, gemmData, workspaceBytes, requestedAlgoCount, results);
 

@@ -332,7 +332,8 @@ namespace rocblaslt
     {
         ROCBLASLT_GEMM             = 1,
         ROCBLASLT_GROUPED_GEMM     = 2,
-        ROCBLASLT_GEMMTYPE_UNKNOWN = 3
+        ROCBLASLT_B2B_GEMM         = 3,
+        ROCBLASLT_GEMMTYPE_UNKNOWN = 4
     };
 
     struct RocGemmProblemType

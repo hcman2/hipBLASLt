@@ -99,6 +99,7 @@ struct RocblasltContractionProblem
     size_t batch_count;
     bool   strided_batch;
     bool   grouped_gemm;
+    bool   b2b_gemm;
     bool   gradient;
 
     rocblaslt_compute_type compute_type;
@@ -144,6 +145,7 @@ struct RocblasltContractionProblem
                                 int64_t                batch_count,
                                 bool                   strided_batch,
                                 bool                   grouped_gemm,
+                                bool                   b2b_gemm,
                                 bool                   gradient,
                                 rocblaslt_compute_type compute_type,
                                 const void*            bias,
@@ -188,6 +190,7 @@ struct RocblasltContractionProblem
         , batch_count(batch_count)
         , strided_batch(strided_batch)
         , grouped_gemm(grouped_gemm)
+        , b2b_gemm(b2b_gemm)
         , gradient(gradient)
         , compute_type(compute_type)
         , bias(bias)
@@ -198,6 +201,11 @@ struct RocblasltContractionProblem
         , workspaceSize(workspaceSize)
         , stream(stream)
     {
+    }
+
+    void resetAlpha(Tc* a) const
+    {
+        alpha = a;
     }
 };
 
@@ -231,6 +239,12 @@ template <typename Ti, typename To, typename Tc>
 rocblaslt_status groupedGemmCreate(std::vector<RocblasltContractionProblem<Ti, To, Tc>>& probs,
                                    std::shared_ptr<void>&                                gemmData,
                                    size_t&                                               gemmCount);
+
+template <typename Ti, typename To, typename Tc>
+rocblaslt_status b2bGemmCreate(RocblasltContractionProblem<Ti, To, Tc> const& problem1,
+                               RocblasltContractionProblem<Ti, To, Tc> const& problem2,
+                               std::shared_ptr<void>&                         gemmData,
+                               size_t&                                        gemmCount);
 
 rocblaslt_status makeArgument(rocblaslt_handle             handle,
                               const rocblaslt::RocGemmType gemmType,

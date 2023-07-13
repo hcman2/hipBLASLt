@@ -145,6 +145,9 @@ namespace
                 if(arg.grouped_gemm > 0)
                     name << "_GG" << arg.grouped_gemm;
 
+                if(arg.b2b_gemm)
+                    name << "_B2BG" << arg.b2b_gemm;
+
                 // grouped gemm only supports ext
                 if(arg.use_ext || arg.grouped_gemm > 0)
                     name << "_APIExt";

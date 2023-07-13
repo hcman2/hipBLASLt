@@ -3743,7 +3743,10 @@ class KernelWriterAssembly(KernelWriter):
       if regTag != lastRegTag:
         lastRegTag = regTag
         if self.sgprPool.pool[i].status == RegisterPool.Status.InUse:
-          module.add(self.undefineSgpr(regTag))
+          if label != "Summation_End_OptNLL":
+            module.add(self.undefineSgpr(regTag))
+          else:
+            self.undefineSgpr(regTag)
 
     if self.db["InitVgpr"] & 0x2:
       module.add(self.vgprPool.initTmps(self.consts.initVgprValue,start=0, stop=100))

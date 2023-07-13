@@ -1425,11 +1425,40 @@ namespace Tensile
                 virtual bool operator()(ContractionProblemGemm const& problem) const override
                 {
                     auto sizes = problem.problemSizes();
-                    if (sizes[1] != 256 && sizes[1] != 128 && sizes[1] != 64)
+                    if (value && sizes[1] != 256 && sizes[1] != 128 && sizes[1] != 64)
                     {
+                        //std::cout<<"B2BGemm size mismatch : "<<sizes[1]<<std::endl;
                         return false;
                     }
                     return problem.b2bGemm() == value;
+                }
+
+                virtual bool debugEval(ContractionProblemGemm const& problem,
+                                       std::ostream&                 stream) const override
+                {
+                    bool rv = (*this)(problem);
+                    
+                    stream << this->type() << "(";
+
+                    if(problem.b2bGemm())
+                    {
+                        stream <<"problem is b2bgemm,";
+                    }
+                    else
+                    {
+                        stream <<"problem is not b2bgemm,";
+                    }
+                    if(value)
+                    {
+                        stream <<"solution is b2bgemm,";
+                    }
+                    else
+                    {
+                        stream <<"solution is not b2bgemm,";
+                    }
+
+                    stream <<"): " << rv;
+                    return rv;
                 }
             };
 
