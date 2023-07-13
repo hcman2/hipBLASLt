@@ -9100,16 +9100,26 @@ class KernelWriterAssembly(KernelWriter):
     #TODO: remove, temp use getOffset here
     b1KernelArgOffset = self.argLoader.getOffset()
 
-    with self.allocTmpSgpr(1) as tmpSgprInfo:
+    with self.allocTmpSgpr(2) as tmpSgprInfo:
       module.addComment("B2BGemm setup B1 address")
       module.add(SLoadB64(sgpr("StridesB1", 2), sgpr('KernArgAddress', 2), hex(b1KernelArgOffset)))
       module.add(SLoadB64(sgpr("SrdB1", 2), sgpr('KernArgAddress', 2), hex(b1KernelArgOffset + 8)))
       module.add(SWaitCnt(lgkmcnt=0))
       numElements = kernel['MacroTile1'] ** 2
       numElements *= tPB["bpe"]
+      #module.add(SMovB32(sgpr(tmpSgprInfo.idx), hex(kernel['MacroTile1']), "MT1"))
+      #module.add(SSubU32(sgpr(tmpSgprInfo.idx), sgpr("StridesB1"), sgpr(tmpSgprInfo.idx), "tmp = strideB11 - MT1"))
+      #module.add(SSubU32(sgpr(tmpSgprInfo.idx), sgpr("StridesB1+1"), sgpr(tmpSgprInfo.idx), "ShadowLimit = strideB12 - tmp"))
+      module.add(SMulHIU32(sgpr(tmpSgprInfo.idx), sgpr("StridesB1+1"), sgpr("WorkGroup2"), "Stride*WG"))
+      module.add(SMulI32(sgpr(tmpSgprInfo.idx+1), sgpr("StridesB1+1"), sgpr("WorkGroup2"), "Stride*WG"))
+      module.add(SLShiftLeftB64(dst=sgpr(tmpSgprInfo.idx,2),  src=sgpr(tmpSgprInfo.idx,2), \
+              shiftHex=hex(log2(tPB["bpe"])), comment="tileStart *= BPE"))
+      module.add(SAddU32(sgpr("SrdB1"), sgpr("SrdB1"), sgpr(tmpSgprInfo.idx), "SRD base = Address+ tileStart0"))
+      module.add(SAddCU32(sgpr("SrdB1+1"), sgpr("SrdB1+1"), sgpr(tmpSgprInfo.idx+1), "SRD base = Address+ tileStart1"))
+
       module.add(SMovB32(sgpr(tmpSgprInfo.idx), hex(kernel['MacroTile1']), "MT1"))
-      module.add(SSubU32(sgpr(tmpSgprInfo.idx), sgpr("StridesB1"), sgpr(tmpSgprInfo.idx), "tmp = strideB11 - MT1"))
-      module.add(SSubU32(sgpr(tmpSgprInfo.idx), sgpr("StridesB1+1"), sgpr(tmpSgprInfo.idx), "ShadowLimit = strideB12 - tmp"))
+      module.add(SMulI32(sgpr(tmpSgprInfo.idx), sgpr("StridesB1"), sgpr(tmpSgprInfo.idx), "ShadowLimit"))
+
       module.add(SLShiftLeftB32(dst=sgpr("SrdB1+2"), src=sgpr(tmpSgprInfo.idx), shiftHex=log2(self.states.bpeCexternal)))
       module.add(SMovB32(sgpr("SrdB1+3"), 'Srd127_96'))
     return module

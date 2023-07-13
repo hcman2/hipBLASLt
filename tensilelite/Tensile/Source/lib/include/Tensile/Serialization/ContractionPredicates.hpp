@@ -111,6 +111,7 @@ namespace Tensile
                     Base::template Pair<Predicates::Contraction::SparseA>(),
                     Base::template Pair<Predicates::Contraction::F32XdlMathOpEqual>(),
                     Base::template Pair<Predicates::Contraction::SupportDeviceUserArguments>(),
+                    Base::template Pair<Predicates::Contraction::ProblemSizeEqual>(),
                 });
 
                 auto gmap = Generic::GetSubclasses();
@@ -432,6 +433,12 @@ namespace Tensile
         template <typename IO>
         struct MappingTraits<Predicates::Contraction::ActivationEnumWhiteList, IO>
             : public AutoMappingTraits<Predicates::Contraction::ActivationEnumWhiteList, IO>
+        {
+        };
+
+        template <typename IO>
+        struct MappingTraits<Predicates::Contraction::ProblemSizeEqual, IO>
+            : public AutoMappingTraits<Predicates::Contraction::ProblemSizeEqual, IO>
         {
         };
 

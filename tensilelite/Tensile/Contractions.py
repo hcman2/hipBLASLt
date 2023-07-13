@@ -392,6 +392,10 @@ class ProblemPredicate(Properties.Predicate):
     @classmethod
     def CompoundPredicates(cls, state, problemType):
         rv = []
+        
+        if state['ProblemType']['B2BGemm']:
+            MT1 = state['MacroTile1']
+            rv += [cls('ProblemSizeEqual', index=1, value=MT1)]
 
         if not problemType.aType.isInt8x4():
             # calculate the minimum supported free dimension size

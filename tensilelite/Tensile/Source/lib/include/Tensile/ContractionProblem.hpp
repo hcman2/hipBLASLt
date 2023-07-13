@@ -892,6 +892,7 @@ namespace Tensile
                                                            double   alpha,
                                                            double   beta,
                                                            bool     isGroupedGemm,
+                                                           bool     isB2BGemm,
                                                            size_t   maxWorkspaceBytes);
 
     private:

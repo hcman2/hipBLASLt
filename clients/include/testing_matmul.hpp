@@ -264,6 +264,7 @@ void testing_matmul(const Arguments& arg)
     using Talpha = float;
 
     bool    do_grouped_gemm = arg.grouped_gemm > 0;
+    bool    do_b2b_gemm     = arg.b2b_gemm;
     int32_t gemm_count      = std::max(1, arg.grouped_gemm);
 
     std::vector<int64_t> M(gemm_count), N(gemm_count), K(gemm_count), lda(gemm_count),
@@ -772,9 +773,15 @@ void testing_matmul(const Arguments& arg)
         extproblemtype.type_compute = arg.compute_type;
     }
 
-    hipblaslt_ext::GemmType gemmType = do_grouped_gemm
-                                           ? hipblaslt_ext::GemmType::HIPBLASLT_GROUPED_GEMM
-                                           : hipblaslt_ext::GemmType::HIPBLASLT_GEMM;
+    hipblaslt_ext::GemmType gemmType = hipblaslt_ext::GemmType::HIPBLASLT_GEMM;
+    if(do_grouped_gemm)
+    {
+        gemmType = hipblaslt_ext::GemmType::HIPBLASLT_GROUPED_GEMM;
+    }
+    else if(do_b2b_gemm)
+    {
+        gemmType = hipblaslt_ext::GemmType::HIPBLASLT_B2B_GEMM;
+    }
 
     if(arg.algo_method == 2)
     {

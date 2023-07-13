@@ -288,7 +288,6 @@ namespace Tensile
                     rv.back().setDeterministicMode(m_deterministicMode);
                     rv.back().setFp16AltImpl(m_fp16AltImpl);
                     rv.back().setWorkspaceSize(m_maxWorkspaceSize);
-                    rv.back().setActivationHPA(m_activationHPA);
                     rv.back().setScaleDVec(m_constantTypes[ContractionProblemGemm::CONST::ALPHA],
                                         rv.back().d().sizes()[0]);
                     rv.back().setGroupedGemm(m_groupedGemm);
@@ -297,7 +296,6 @@ namespace Tensile
                     //Fixed config for 1st GEMM
                     rv.back().setCEqualsD(false);
                     rv.back().setUseBias(false);
-                    rv.back().setActivationType(ActivationType::None);
                     rv.back().setBias(DataType::None, 0);
                     rv.back().setActivationType(ActivationType::None);
                     rv.back().setUseScaleDVec(false);
@@ -363,7 +361,6 @@ namespace Tensile
                     {
                         rv.back().setActivationType(m_activationType);
                     }
-                    rv.back().setActivationHPA(m_activationHPA);
                     rv.back().setUseScaleDVec(m_useScaleDVec);
                     rv.back().setScaleDVec(m_constantTypes[ContractionProblemGemm::CONST::ALPHA],
                                         rv.back().d().sizes()[0]);

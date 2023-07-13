@@ -104,6 +104,7 @@ void Arguments::init()
     bias_vector       = false;
     scaleD_vector     = false;
     grouped_gemm      = 0;
+    b2b_gemm          = false;
     c_noalias_d       = false;
     HMM               = false;
     use_e             = false;

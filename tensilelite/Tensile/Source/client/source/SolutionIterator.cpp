@@ -356,8 +356,8 @@ namespace Tensile
             }
             else if(auto b2bProblem = dynamic_cast<const ContractionProblemB2BGemm*>(problem))
             {
-                m_solutions = m_library->findTopSolutionsGroupedGemm(
-                    b2bProblem->gemms, *m_hardware, m_numSolutions);
+                m_solutions = m_library->findTopSolutions(
+                    b2bProblem->gemms[0], *m_hardware, m_numSolutions);
             }
             else if(auto gemmProblem = dynamic_cast<const ContractionProblemGemm*>(problem))
             {

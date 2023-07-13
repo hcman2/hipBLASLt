@@ -1144,6 +1144,7 @@ namespace Tensile
                                                                         double   alpha,
                                                                         double   beta,
                                                                         bool     isGroupedGemm,
+                                                                        bool     isB2BGemm,
                                                                         size_t   maxWorkspaceBytes)
     {
         assert(typeBeta == typeCompute);
@@ -1249,6 +1250,7 @@ namespace Tensile
         // set batch mode
         problem.setStridedBatched(true);
         problem.setGroupedGemm(isGroupedGemm);
+        problem.setB2BGemm(isB2BGemm);
         if(isGroupedGemm)
             problem.setUseDeviceUserArguments(true);
 

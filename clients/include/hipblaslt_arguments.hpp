@@ -125,6 +125,7 @@ struct Arguments
     bool                  use_e;
     bool                  gradient;
     bool                  norm_check_assert;
+    bool                  b2b_gemm;
 
     // API related
     bool use_ext;
@@ -177,6 +178,7 @@ struct Arguments
     OPER(initialization) SEP         \
     OPER(pad) SEP                    \
     OPER(grouped_gemm) SEP           \
+    OPER(b2b_gemm) SEP               \
     OPER(threads) SEP                \
     OPER(streams) SEP                \
     OPER(devices) SEP                \

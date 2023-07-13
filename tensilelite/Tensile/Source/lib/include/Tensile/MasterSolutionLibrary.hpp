@@ -129,6 +129,7 @@ namespace Tensile
                                                                1.0,
                                                                1.0,
                                                                solution->problemType.groupedGemm,
+                                                               solution->problemType.b2bGemm,
                                                                std::numeric_limits<size_t>::max());
                 solution->requiredHostWorkspaceSizePerProblem
                     = solution->requiredHostSizeGroupedGemmSingle(problem);
