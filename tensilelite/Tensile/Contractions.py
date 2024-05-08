@@ -412,6 +412,18 @@ class ProblemPredicate(Properties.Predicate):
     def CompoundPredicates(cls, state, problemType):
         rv = []
 
+        if "UserDefinedPredicate" in state:
+            valuepredicates = [];
+            valuepredicates.append(state["MacroTile0"])
+            valuepredicates.append(state["MacroTile1"])
+            valuepredicates.append(state["DepthU"])
+            valuepredicates.append(state["MIWaveTile"][0]*state["MIWaveTile"][1])
+            valuepredicates.append(state["LdsNumBytes"])
+            valuepredicates.append(state["NumThreads"])
+            valuepredicates.append(state["GlobalSplitU"])
+            valuepredicates.append(state["LocalSplitU"])
+            rv += [cls('UserDefinedPredicate', index=0, value=valuepredicates)]
+
         if "BatchSizeEqual" in state:
             rv += [cls('BatchSizeEqual', index=0, value=state["BatchSizeEqual"])]
 

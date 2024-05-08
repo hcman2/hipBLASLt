@@ -469,6 +469,7 @@ namespace Tensile
             int                   sparse                     = 0;
             bool                  stochasticRounding         = false;
             bool                  supportDeviceUserArguments = false;
+            bool                  UserDefinedPredicate       = true;
         };
 
         struct LinearModel

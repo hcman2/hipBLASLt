@@ -2400,6 +2400,60 @@ namespace Tensile
                     return rv;
                 }
             };
+
+            struct UserDefinedPredicate
+                : public Predicate_CRTP<UserDefinedPredicate, ContractionProblemGemm>
+            {
+                enum
+                {
+                    HasIndex = true,
+                    HasValue = true
+                };
+                size_t             index;
+                std::array<int, 8> value;
+
+                UserDefinedPredicate() = default;
+                UserDefinedPredicate(size_t index, std::array<int, 8> value)
+                    : index(index)
+                    , value(value)
+                {
+                }
+
+                static std::string Type()
+                {
+                    return "UserDefinedPredicate";
+                }
+
+                virtual bool operator()(ContractionProblemGemm const& problem) const override
+                {
+                    // valuepredicates.append(state["MacroTile0"])
+                    // valuepredicates.append(state["MacroTile1"])
+                    // valuepredicates.append(state["DepthU"])
+                    // valuepredicates.append(state["MIWaveTile"][0]*state["MIWaveTile"][1])
+                    // valuepredicates.append(state["LdsNumBytes"])
+                    // valuepredicates.append(state["NumThreads"])
+                    // valuepredicates.append(state["GlobalSplitU"])
+                    // valuepredicates.append(state["LocalSplitU"])
+                    //if(value[7] != 1) // Reject LSU solution
+                    //    return false;
+                    //if(value[4] < 32768) // Reject lds usage solution
+                    //    return false;
+                    int mt1 = value[1];
+                    int N = problem.problemSizes()[1];
+                    if(mt1 > N) // Reject MT1 > N solution
+                        return false;
+                    return true;
+                }
+
+                virtual bool debugEval(ContractionProblemGemm const& problem,
+                                       std::ostream&                 stream) const override
+                {
+                    int lds = value[4];
+                    int mt1 = value[1];
+                    return debugEvalCmp(
+                        problem, stream, "prob", mt1, "==", "sol", lds); // Just print the info you wonder
+                }
+            };
         } // namespace Contraction
 
         /**
