@@ -2426,6 +2426,16 @@ class Solution(collections.abc.Mapping):
       if state["ProblemType"]["DataType"].isInt8():
         reject(state, "int8 doesn't support LocalSplitU")
         return
+      if state["MIWaveGroup"][0] * state["MIWaveGroup"][1] == 2 and state["LocalSplitU"] != 2:
+        reject(state, "2-wave MT needs LSU2 only.")
+        return
+      if state["MIWaveGroup"][0] * state["MIWaveGroup"][1] == 1 and state["LocalSplitU"] != 4:
+        reject(state, "1-wave MT needs LSU4 only.")
+        return
+    else:
+      if state["MIWaveGroup"][0] * state["MIWaveGroup"][1] < 4:
+        reject(state, "< 4-wave MT needs LSU > 1")
+        return
 
     # GlobalSplitU doesn't work with some other things:
     if state["GlobalSplitU"] > 1:
