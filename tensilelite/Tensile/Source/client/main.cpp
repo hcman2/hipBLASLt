@@ -373,14 +373,73 @@ namespace Tensile
 
             return hip::GetCurrentDevice();
         }
+        
+        using CUMaskComponent              = std::uint32_t;
+        using CUMask                       = std::vector<CUMaskComponent>;
+        constexpr auto CUMaskComponentSize = sizeof(CUMaskComponent) * 2;
+        CUMask         toCUMask(const std::string& maskString)
+        {
+            auto beg = maskString.find("0x");
+
+            if(beg != std::string::npos)
+            {
+                beg += 2;
+            }
+
+            CUMask mask;
+
+            for(auto i = beg; i < maskString.size(); i += CUMaskComponentSize)
+            {
+                auto substr = maskString.substr(i, CUMaskComponentSize);
+                mask.push_back(std::stoul(substr, nullptr, 16));
+            }
+
+            return mask;
+        }
 
         hipStream_t GetStream(po::variables_map const& args)
         {
             if(args["use-default-stream"].as<bool>())
                 return 0;
-
+            
+                
             hipStream_t stream;
-            HIP_CHECK_EXC(hipStreamCreate(&stream));
+            bool useCUMask = true;
+            if(useCUMask)
+            {
+                CUMask cuMask;
+                //const std::string maskString =   "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff";
+                const std::string maskString = "0x00000000000000000000000000000000000000000000000000000000000000000000000001010101";
+                // XCC index -> SE -> CU so first 32-bit should be XCD[0:7] SE[0:3] CU[0].
+
+                // CHECK_HIP_ERROR(hipExtStreamCreateWithCUMask(&stream, cuMask.size(), cuMask.data()));
+                //auto mMask = toCUMask(maskString);
+                //std::vector<uint32_t> mMask(10,0x01010101);
+                #define NUM_XCDS (8)
+                #define NUM_CUS_PER_XCD (38)
+                std::vector<uint32_t> mMask(NUM_XCDS * ((NUM_CUS_PER_XCD + 31) / 32), 0);
+
+                // Set 5th CU for each XCD in mask
+                std::vector<uint32_t> enabledXCD = {1}; //{0,1,2,3,4,5,6,7};
+                uint32_t enabledCUnumber = 38;
+                for(int c=0;c<enabledCUnumber;c++)
+                    for (auto x : enabledXCD) {
+                        int targetBit = c * NUM_XCDS + x;
+                        mMask[targetBit / 32] |= (1<<(targetBit%32));
+                    }
+
+                //std::vector<uint32_t> mMask(10,0xFFFFFFFF);
+                std::cout<<"mMask size = "<<mMask.size()<<std::endl;
+                for(auto m :mMask )
+                {
+                    std::cout<<"mMask value = "<<std::hex<<m<<std::endl;
+                }
+                HIP_CHECK_EXC(hipExtStreamCreateWithCUMask(&stream, mMask.size(), mMask.data()));
+            }
+            else
+            {
+                HIP_CHECK_EXC(hipStreamCreate(&stream));
+            }
             return stream;
         }
 
