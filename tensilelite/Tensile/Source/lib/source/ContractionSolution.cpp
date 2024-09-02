@@ -816,7 +816,8 @@ namespace Tensile
                                          uint32_t                            argType,
                                          KA&                                 args,
                                          uint32_t                            numWorkGroups,
-                                         const ContractionProblemParameters& param) const
+                                         const ContractionProblemParameters& param,
+                                         int32_t                             computedWGM) const
     {
         if constexpr(!Legacy)
         {
@@ -826,15 +827,17 @@ namespace Tensile
             args.template append<uint32_t>("gemm_count", gemmCount);
         }
 
-        uint32_t gsu      = param.gsu() > 0 ? param.gsu() : sizeMapping.globalSplitU;
-        bool     gsuc     = false; // initialized false
-        bool     gsuwgmrr = false; // initialized false
-        int32_t  wgm      = param.wgm() != 0 ? param.wgm() : sizeMapping.workGroupMapping;
+        uint32_t gsu = param.gsu() > 0 ? param.gsu() : sizeMapping.globalSplitU;
+        int32_t  wgm = param.wgm() != 0 ? param.wgm() : sizeMapping.workGroupMapping;
+        if(wgm == 0)
+        {
+            //std::cout<<"wgm changed from "<<wgm<<" to "<<computedWGM<<std::endl;
+            wgm = computedWGM;
+        }
+
         const uint32_t mask16       = 0xFFFF;
-        const uint32_t mask14       = 0x3FFF;
         const uint32_t mask8        = 0xFF;
         uint32_t       internalArg0 = 0;
-
         if(internalArgsSupport.wgm && internalArgsSupport.version == 0)
         {
             if(wgm > 255)
@@ -966,7 +969,8 @@ namespace Tensile
 
         if(internalArgsSupport.useUniversalArgs)
         {
-            kernelArgs<T_Debug, false>(1, 0, rv.args, getNumWorkGroups(rv), problem.getParams());
+            auto hr = computeL2CacheHitRate(problem.problemSizes()[0], problem.problemSizes()[1], problem.getParams());
+            kernelArgs<T_Debug, false>(1, 0, rv.args, getNumWorkGroups(rv), problem.getParams(), hr.finalWGM);
         }
         singleCallArgs<T_Debug, true>(problem, inputs, 0, rv.args);
 
@@ -2813,6 +2817,191 @@ namespace Tensile
               * granularities.suCuGranularity * granularities.suWaveGranularity;
 
         return granularities;
+    }
+
+    ContractionSolution::L2CacheHitRate ContractionSolution::computeL2CacheHitRate(
+        uint32_t M, uint32_t N, const ContractionProblemParameters& param) const
+    {
+        uint32_t gsu = param.gsu() > 0 ? param.gsu() : sizeMapping.globalSplitU;
+
+        ContractionSolution::L2CacheHitRate hitRate;
+
+        uint32_t MT0 = sizeMapping.macroTile.x;
+        uint32_t MT1 = sizeMapping.macroTile.y;
+
+        uint32_t NumCUs        = 304;
+        uint32_t NumXCDs       = 8; //FIXME: get from device
+
+        hitRate.MT0  = MT0;
+        hitRate.MT1  = MT1;
+        hitRate.CUs  = NumCUs;
+        hitRate.XCDs = NumXCDs;
+
+        uint32_t wg0 = CeilDivide(M, MT0);
+        uint32_t wg1 = CeilDivide(N, MT1);
+        hitRate.WG0  = wg0;
+        hitRate.WG1  = wg1;
+
+        //std::cout<<"wg0="<<wg0<<", wg1 = "<<wg1<<", MT0 = "<<MT0<<", MT1 = "<<MT1<<std::endl;
+
+        // other info
+        uint32_t L2CacheLineSize = 128; //Bytes
+        uint32_t L2Capacity      = 4;   //MBs
+        uint32_t depthU          = sizeMapping.depthU;
+
+        std::vector<uint32_t> arrA(gsu*wg0, 0);
+        std::vector<uint32_t> arrB(gsu*wg1, 0);
+
+        uint32_t WGMXCC  = NumXCDs;
+        uint32_t WGMXCCG = NumCUs;
+        assert((WGMXCCG % WGMXCC) == 0);
+
+        uint32_t xccIdx      = 0;
+        uint32_t score       = 0;
+        uint32_t totalWGNum  = gsu * wg0 * wg1;
+        uint32_t totalWG0WG1 = wg0 * wg1;
+        uint32_t xccgdiv     = totalWGNum / WGMXCCG;
+        uint32_t xccgres     = totalWGNum % WGMXCCG;
+
+        // wgm list
+        std::vector<int32_t> wgmList = {1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16}; //,-1,-2,-3,-4,-5,-6,-7,-8,-9,-10,-11,-12,-13,-14,-15,-16};
+        //int32_t wgm = wgmList[0];
+
+        double hitRateA     = 0;
+        double hitRateB     = 0;
+        double totalHitRate = 0;
+        int32_t finalwgm    = 0;
+
+        double aRatio   = float(MT0) / float(MT0 + MT1);
+        double bRatio   = float(MT1) / float(MT0 + MT1);
+
+        //std::cout<<"GSU="<<gsu<<", aRatio = "<<aRatio<<", bRatio = "<<bRatio<<std::endl;
+        for(auto & wgm : wgmList)
+        {
+            uint32_t hitA    = 0;
+            uint32_t hitB    = 0;
+            uint32_t missA   = 0;
+            uint32_t missB   = 0;
+
+            for(uint32_t wg = 0; wg < totalWGNum; wg++)
+            {
+                //clean cache
+                if((wg % WGMXCCG) == 0)
+                {
+                    //std::cout<<"wg = "<<wg<<", reset array"<<std::endl;
+                    arrA.assign(wg0*gsu, 0);
+                    arrB.assign(wg1*gsu, 0);
+                }
+
+                // go xccgroup
+                //std::cout<<"go xccgroup";
+                uint32_t xccgIdx  = wg / WGMXCCG;
+                uint32_t realWGId = xccgIdx * WGMXCCG;
+
+                // get xccgroup wgNum
+                //std::cout<<"get xccgroup wgNum";
+                uint32_t xccgWgNum = min(WGMXCCG, totalWGNum - realWGId);
+                // how many wg per xcc in this xccgroup
+                uint32_t xccunit = xccgWgNum / WGMXCC;
+                uint32_t xccres  = xccgWgNum % WGMXCC;
+                // starting wgId
+                uint32_t resWGId = (wg - realWGId) % xccgWgNum;
+
+                // go xcc
+                //std::cout<<"go xcc";
+                uint32_t xccIdx = resWGId % WGMXCC;
+                // skip previous xcc
+                uint32_t skip = 0;
+                for(int i = 0; i < xccIdx; i++)
+                {
+                    // skip i
+                    skip += xccunit;
+                    if (i < xccres)
+                    {
+                        // this xcc has extra 1 wg
+                        skip += 1;
+                    }
+                }
+                realWGId += skip;
+
+                // go inner xccid
+                // in XCCN, we get the idx of the wg in XCCN.
+                uint32_t innerXccId = resWGId / WGMXCC;
+                realWGId           += innerXccId;
+                
+                //go GSU
+                //std::cout<<"go GSU";
+                uint32_t gsuSumIdx = realWGId / totalWG0WG1;
+                realWGId           = realWGId % totalWG0WG1;
+
+                // do workgroupmapping with realWGId
+                //std::cout<<"go workgroupmapping";
+                uint32_t finalwg1, finalwg0;
+                if(wgm > 0)
+                {
+                    uint32_t wg1_0       = (realWGId / (wg0 * wgm)) * wgm;
+                    uint32_t residualWG  = realWGId - (wg1_0 * wg0);
+                    uint32_t adjustedWGM = min(wg1 - wg1_0, wgm); // for tail
+                    uint32_t wg0_0       = residualWG / adjustedWGM;
+                    uint32_t wg1_1       = residualWG - (wg0_0 * adjustedWGM);
+
+                    finalwg1    = wg1_0 + wg1_1;
+                    finalwg0    = wg0_0;
+                }
+                else
+                {
+                    //WGM < 0
+                    int32_t pwgm         = 0 - wgm;
+                    uint32_t wg0_0       = (realWGId / (wg1 * pwgm)) * pwgm;
+                    uint32_t residualWG  = realWGId - (wg0_0 * wg1);
+                    uint32_t adjustedWGM = min(wg0 - wg0_0, pwgm); // for tail
+                    uint32_t wg1_0       = residualWG / adjustedWGM;
+                    uint32_t wg0_1       = residualWG - (wg1_0 * adjustedWGM);
+
+                    finalwg0    = wg0_0 + wg0_1;
+                    finalwg1    = wg1_0;
+                }
+                //std::cout<<"gsuSumIdx, finalwg0, finalwg1 = "<<gsuSumIdx<<","<<finalwg0<<","<<finalwg1<<std::endl;
+                if(arrA[gsuSumIdx*wg0 + finalwg0] & (1<<xccIdx))
+                {
+                    hitA++;
+                    //std::cout<<"hitA"<<std::endl;
+                }
+                else
+                {
+                    missA++;
+                    //std::cout<<"missA"<<std::endl;
+                    arrA[gsuSumIdx*wg0 + finalwg0] |= (1<<xccIdx);
+                }
+                    
+                if(arrB[gsuSumIdx*wg1+finalwg1] & (1<<xccIdx))
+                {
+                    hitB++;   
+                    //std::cout<<"hitB"<<std::endl; 
+                }
+                else
+                {
+                    missB++;
+                    //std::cout<<"missB"<<std::endl;
+                    arrB[gsuSumIdx*wg1+finalwg1] |= (1<<xccIdx);
+                }
+            }
+
+            hitRateA = float(hitA) / float(hitA + missA);
+            hitRateB = float(hitB) / float(hitB + missB);
+
+            totalHitRate = (aRatio * hitRateA) + (bRatio * hitRateB);
+            //std::cout<<"GSU="<<gsu<<",wgm="<<wgm<<",hitRateA="<<hitRateA<<",hitRateB="<<hitRateB<<",totalHitRate =      "<<totalHitRate<<std::endl;
+            if(totalHitRate > hitRate.totalHitRate)
+            {
+                hitRate.totalHitRate = totalHitRate;
+                hitRate.tile0HitRate = hitRateA;
+                hitRate.tile1HitRate = hitRateB;
+                hitRate.finalWGM     = wgm;
+            }
+        }
+
+        return hitRate;
     }
 
     ContractionSolution::ProjectedPerformance

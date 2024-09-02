@@ -193,6 +193,23 @@ namespace Tensile
             double LSU;
         };
 
+        struct L2CacheHitRate
+        {
+            double tile0HitRate          = 0.0;
+            double tile1HitRate          = 0.0;
+            double totalHitRate          = 0.0;
+
+            int CUs = 0;
+            int XCDs = 0;
+
+            uint32_t MT0;
+            uint32_t MT1;
+            uint32_t WG0;
+            uint32_t WG1;
+
+            int32_t finalWGM;
+        };
+
         struct ProjectedPerformance
         {
             Granularities granularities;
@@ -231,6 +248,9 @@ namespace Tensile
 
         Granularities computeGranularities(
             Hardware const& hardware, double M, double N, double K, double NumBatches) const;
+
+        L2CacheHitRate computeL2CacheHitRate(
+            uint32_t M, uint32_t N, const ContractionProblemParameters& param) const;
 
         StaticPerformanceModel staticPerformanceModel(double M,
                                                       double N,
@@ -324,7 +344,8 @@ namespace Tensile
                         uint32_t                            argType,
                         KA&                                 args,
                         uint32_t                            numWorkGroups,
-                        const ContractionProblemParameters& param) const;
+                        const ContractionProblemParameters& param,
+                        int32_t                             computedWGM=0) const;
 
         template <typename KA>
         inline void calculateSingleCallWorkGroupItems(std::vector<Problem> const& problems,
@@ -443,8 +464,6 @@ namespace Tensile
             std::string customKernelName;
 
             int workGroupMappingXCC = 1;
-            bool globalSplitUCoalesced = false;
-            bool globalSplitUWorkGroupMappingRoundRobin = false;
         };
 
         struct InternalArgsSupport
