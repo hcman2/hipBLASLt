@@ -373,14 +373,52 @@ namespace Tensile
 
             return hip::GetCurrentDevice();
         }
+        
+        using CUMaskComponent              = std::uint32_t;
+        using CUMask                       = std::vector<CUMaskComponent>;
+        constexpr auto CUMaskComponentSize = sizeof(CUMaskComponent) * 2;
+        CUMask         toCUMask(const std::string& maskString)
+        {
+            auto beg = maskString.find("0x");
+
+            if(beg != std::string::npos)
+            {
+                beg += 2;
+            }
+
+            CUMask mask;
+
+            for(auto i = beg; i < maskString.size(); i += CUMaskComponentSize)
+            {
+                auto substr = maskString.substr(i, CUMaskComponentSize);
+                mask.push_back(std::stoul(substr, nullptr, 16));
+            }
+
+            return mask;
+        }
 
         hipStream_t GetStream(po::variables_map const& args)
         {
             if(args["use-default-stream"].as<bool>())
                 return 0;
-
+            
+                
             hipStream_t stream;
-            HIP_CHECK_EXC(hipStreamCreate(&stream));
+            bool useCUMask = false;
+            if(useCUMask)
+            {
+                CUMask cuMask;
+                //const std::string maskString = "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff";
+                const std::string maskString = "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff";
+
+                //CHECK_HIP_ERROR(hipExtStreamCreateWithCUMask(&stream, cuMask.size(), cuMask.data()));
+                auto mMask = toCUMask(maskString);
+                HIP_CHECK_EXC(hipExtStreamCreateWithCUMask(&stream, mMask.size(), mMask.data()));
+            }
+            else
+            {
+                HIP_CHECK_EXC(hipStreamCreate(&stream));
+            }
             return stream;
         }
 
