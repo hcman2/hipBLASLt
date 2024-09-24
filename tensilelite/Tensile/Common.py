@@ -981,6 +981,13 @@ validParameters = {
     "GlobalReadVectorWidthA":      [ -2, -1, 1, 2, 3, 4, 6, 8, 16 ],
     "GlobalReadVectorWidthB":      [ -2, -1, 1, 2, 3, 4, 6, 8, 16 ],
 
+    # Generally, Local write vector width should be the same as GRVW.
+    # Large LWVW costs more issue cycles then smaller.
+    # Use this option to control the maximum LWVW.
+    # 0 : The same as GRVW
+    # 1 : Choose the best width to fit the MI latency.
+    "SplitLocalWrite":             [ 0, 1],
+
     # Controls desired width (#elements) for loads from LDS -> VGPR.
     # -1 : Set LocalReadVectorWidth =  VectorWidth
     #  1 cannot be used for half type.
@@ -1157,6 +1164,7 @@ defaultBenchmarkCommonParameters = [
     {"StoreVectorWidth":          [ -1 ] },
     {"GlobalReadVectorWidthA":     [ -1 ] },
     {"GlobalReadVectorWidthB":     [ -1 ] },
+    {"SplitLocalWrite":           [ 0 ] },
     {"LocalReadVectorWidth":      [ -1 ] },
     {"WaveSeparateGlobalReadA":   [ 0 ] },
     {"WaveSeparateGlobalReadB":   [ 0 ] },
