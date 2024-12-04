@@ -2819,12 +2819,15 @@ class KernelWriter(metaclass=abc.ABCMeta):
       module.add(self._syncThreads(kernel))
 
       # LocalSplitU: local write
-      module.addComment1("LocalSplitU: local write")
-      module.add(self.localSplitULocalWrite(kernel))
+      #module.addComment1("LocalSplitU: local write")
+      #module.add(self.localSplitULocalWrite(kernel))
 
       # LocalSplitU: local read
-      module.addComment1("LocalSplitU: local read")
-      module.add(self.localSplitULocalRead(kernel))
+      #module.addComment1("LocalSplitU: local read")
+      #module.add(self.localSplitULocalRead(kernel))
+
+      #module.addComment1("LocalSplitU: local write and read")
+      module.add(self.localSplitULocalWriteAndRead(kernel))
 
       # LocalSplitU: global write indices
       # Hide instructions in local read latency
@@ -2833,7 +2836,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
 
       # LocalSplitU: Reduction
       module.addComment1("LocalSplitU: reduction")
-      module.add(self.localSplitUReduction(kernel))
+      #module.add(self.localSplitUReduction(kernel))
 
       # LocalSplitU: global write
       module.addComment1("LocalSplitU: global write")

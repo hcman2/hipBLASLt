@@ -3484,6 +3484,10 @@ class Solution(collections.abc.Mapping):
 
     # lds buffer size for reduction
     ldsNumBytesReduction = state["LocalSplitU"] * state["MacroTile0"] * state["MacroTile1"] * state["ProblemType"]["ComputeDataType"].numBytes() if state["LocalSplitU"] > 1 else 0
+    state["LocalSplitUReuseLDS"] = 1
+    if ldsNumBytesReduction > globalParameters["MaxLDS"]:
+      state["LocalSplitUReuseLDS"] = math.ceil(ldsNumBytesReduction / globalParameters["MaxLDS"])
+      ldsNumBytesReduction = ldsNumBytesReduction // state["LocalSplitUReuseLDS"]
 
     # lds max occupancy
     ldsSizeOccupancy = globalParameters["DeviceLDS"] // state["MaxOccupancy"]
