@@ -7780,6 +7780,7 @@ class KernelWriterAssembly(KernelWriter):
     self.lsuCoordOffset = self.vgprPool.checkOut(1,"lsuCoordOffset")
 
     # Checkout local read resource
+    bpr            = 4 #bytes per register
     bytesPerElem   = kernel["ProblemType"]["ComputeDataType"].numBytes()
     bytesPerVector = self.LSUfullVw * bytesPerElem
     regsPerElem    = kernel["ProblemType"]["ComputeDataType"].numRegisters()
@@ -7793,11 +7794,11 @@ class KernelWriterAssembly(KernelWriter):
     #FIXME: split numTotalAccVgprLdsReduction into store-used and reduction-used. Release reduction-used after reduction.
     assert (numTotalAccVgprLdsReduction%kernel["LocalSplitU"]) == 0
     numTotalAccVgprLdsReduction = numTotalAccVgprLdsReduction // kernel["LocalSplitU"]
-    numTempVgprLsuReduction = numTotalAccVgprLdsReduction * (kernel["LocalSplitU"] - 1)
+    #numTempVgprLsuReduction = numTotalAccVgprLdsReduction * (kernel["LocalSplitU"] - 1)
     self.accVgprLdsReduction    = self.vgprPool.checkOutAligned(numTotalAccVgprLdsReduction, 4, "LsuReduction")
-    self.tempVgprLsuReduction    = self.vgprPool.checkOutAligned(numTempVgprLsuReduction, 4, "TempLsuReduction")
+    #self.tempVgprLsuReduction    = self.vgprPool.checkOutAligned(numTempVgprLsuReduction, 4, "TempLsuReduction")
     module.add(RegSet("v", "vgprLsuReduction", self.accVgprLdsReduction))
-    module.add(RegSet("v", "vgprTempLsuReduction", self.tempVgprLsuReduction))
+    #module.add(RegSet("v", "vgprTempLsuReduction", self.tempVgprLsuReduction))
     self.states.c.startVgprValu = self.accVgprLdsReduction
 
     # Local Read VGPR idx
@@ -7816,14 +7817,6 @@ class KernelWriterAssembly(KernelWriter):
       for lsu in range(kernel["LocalSplitU"]):
         for i in range(startLSUaccIdxSet, endLSUaccIdxSet):
           for j in range(self.LSUfullVw):
-            # if self.LSUelementsArchIdx[lsu][i] + j >= len(arch2acc):
-            #   print("[DEBUG] LocalSplitU = ",kernel["LocalSplitU"])
-            #   print("[DEBUG] lsu = ",lsu)
-            #   print("[DEBUG] startLSUaccIdxSet = ",startLSUaccIdxSet)
-            #   print("[DEBUG] endLSUaccIdxSet = ",endLSUaccIdxSet)
-            #   print("[DEBUG] self.LSUfullVw = ",self.LSUfullVw)
-            #   print("[DEBUG] i = ",i)
-            #   print("[DEBUG] j = ",j)
             accIdx = arch2acc[self.LSUelementsArchIdx[lsu][i] + j]
             neededAccVGPRIdx[lsu].append(accIdx)
             numAccVgpr += 1
@@ -7859,6 +7852,24 @@ class KernelWriterAssembly(KernelWriter):
       tmpVgprRes = RegisterPoolResource(tmpVgpr, 2)
       lsu_id = self.vgprPool.checkOut(1,"lsu_id")
       addr = self.vgprPool.checkOut(1,"addr")
+
+      # Prepare Write/Read instruction info
+      if bytesPerVector % 16 == 0:
+        DSStoreBX    = DSStoreB128
+        DSLoadBX     = DSLoadB128
+        numInstPerVW = bytesPerVector // 16
+        regsPerStore = 4
+      elif bytesPerVector % 8 == 0:
+        DSStoreBX    = DSStoreB64
+        DSLoadBX     = DSLoadB64
+        numInstPerVW = bytesPerVector // 8
+        regsPerStore = 2
+      else:
+        DSStoreBX    = DSStoreB32
+        DSLoadBX     = DSLoadB32
+        numInstPerVW = bytesPerVector // 4
+        regsPerStore = 1
+
       with self.allocTmpSgpr(1) as tmpSgprInfo:
         tmpSgpr = tmpSgprInfo.idx
         # lr1 = serial / kernel["WavefrontSize"]
@@ -7872,7 +7883,7 @@ class KernelWriterAssembly(KernelWriter):
             comment="dataPerWave (%d)"%dataPerWave))
         module.add(VAndB32(vgpr(addr), hex(kernel["WavefrontSize"]-1), vgpr("Serial"), \
             comment="initial addr"))
-        module.add(VLShiftLeftB32(vgpr(addr), 2, vgpr(addr), \
+        module.add(VLShiftLeftB32(vgpr(addr), log2(regsPerStore * bpr), vgpr(addr), \
             comment="initial addr"))
         module.add(VMulLOU32(dst=vgpr(tmpVgpr), src0=sgpr(tmpSgpr), src1=vgpr(lr1), \
             comment="tmp = waveId * dataPerWave"))
@@ -7890,17 +7901,24 @@ class KernelWriterAssembly(KernelWriter):
 
       module.add(Label("localSplitULocalWrite_%d"%(reUseIdx+1), ""))
 
-      for i in range(numAccVgpr):
-        regIdx = i
-        module.add(DSStoreB32(dstAddr=vgpr(addr), src=vgpr(accVgprRes+regIdx), \
-              ds=DSModifiers(offset=(regIdx * 256)), #FIXME: dont hard code
-              comment="arch[%d]"%(i)))
+      # Do Local Write
+      for i in range(0, numAccVgpr // self.LSUfullVw):
+        for v in range(numInstPerVW):
+          regIdx = (i * numInstPerVW + v) * regsPerStore
+          module.add(DSStoreBX(dstAddr=vgpr(addr), src=vgpr(accVgprRes+regIdx, regsPerStore), \
+                ds=DSModifiers(offset=(regIdx * (bpr * kernel["WavefrontSize"]))), \
+                comment="arch[%d]"%(i * numInstPerVW + v)))
+
+      # for i in range(numAccVgpr):
+      #   regIdx = i
+      #   module.add(DSStoreB32(dstAddr=vgpr(addr), src=vgpr(accVgprRes+regIdx), \
+      #         ds=DSModifiers(offset=(regIdx * 256)), #FIXME: dont hard code
+      #         comment="arch[%d]"%(i)))
 
       # Release local write resource
       self.vgprPool.checkIn(accVgprRes)
 
       module.addComment1("LocalSplitU: local read %d/%d"%(reUseIdx+1,kernel["LocalSplitUReuseLDS"]))
-      #module.add(self.localSplitULocalRead(kernel, 0))
 
       # Calculate offset for wave id and lsu id
       with self.allocTmpSgpr(1) as tmpSgprInfo:
@@ -7913,7 +7931,7 @@ class KernelWriterAssembly(KernelWriter):
             comment="Get wave ID"))
         module.add(VAndB32(vgpr(addr), hex(kernel["WavefrontSize"]-1), vgpr("Serial"), \
             comment="initial addr"))
-        module.add(VLShiftLeftB32(vgpr(addr), 2, vgpr(addr), \
+        module.add(VLShiftLeftB32(vgpr(addr), log2(regsPerStore * bpr), vgpr(addr), \
             comment="initial addr"))
         module.add(SMovB32(dst=sgpr(tmpSgpr), src=hex(dataPerWave), \
             comment="wave offset (%d)"%dataPerWave))
@@ -7928,42 +7946,63 @@ class KernelWriterAssembly(KernelWriter):
         module.add(VAddU32(dst=vgpr(addr), src0=vgpr(addr), src1=vgpr(lsu_id), \
             comment="addr += lsu offset"))
 
-      # reuse lsuCoordOffset from local write
-    #  module.add(VAddLShiftLeftU32(dst=vgpr(baseAddr), src0=vgpr(self.lsuCoordOffset), src1=vgpr(baseAddr), shiftHex=hex(log2(self.states.bpeCinternal)), comment="local read LDS address"))
-
       module.add(SWaitCnt(lgkmcnt=0, vscnt=0, comment="wait for all writes"))
       module.add(self._syncThreads(kernel, "post-lsu local write"))
       module.add(Label("localSplitULocalRead_%d"%(reUseIdx+1), ""))
 
       moduleReduction = Module("LocalSplitU_Reduction")
-      #inLoopTmpVgpr   = self.vgprPool.checkOutAligned(numVgprPerLSU*(kernel["LocalSplitU"]-1), 4, "TempLsuReduction")
-      #module.add(RegSet("v", "vgprTempLsuReduction", inLoopTmpVgpr))
+      inLoopTmpVgpr   = self.vgprPool.checkOutAligned(numVgprPerLSU*(kernel["LocalSplitU"]-1), 4, "TempLsuReduction")
 
-      for i in range(0, numVgprPerLSU):
-        for r in range(0, kernel["LocalSplitU"]):
-          reductionIdxOffset = 64*r
-          offset  = r * ldsStride + i * 256 #FIXME: dont hard code
-          if r == 0:
-            vgprStr = "LsuReduction+%u"%(localReadVgprIdx)
-          else:
-            vgprStr = "TempLsuReduction+%u"%(numTotalAccVgprLdsReduction * (r - 1) + localReadVgprIdx)
-          module.add(DSLoadB32(dst=vgpr(vgprStr), src=vgpr(addr), \
-            ds=DSModifiers(offset=(offset)), comment="r=%u i=%u, from acc[%d]"%(r,i,neededAccVGPRIdx[0][i])))
-
-          # Generate Reduction code at the same time.
-          if r > 0:
-            if kernel["ProblemType"]["ComputeDataType"].isSingle():
-              moduleReduction.add(VAddF32(dst=vgpr("LsuReduction+%u"%localReadVgprIdx), src0=vgpr(vgprStr), \
-                          src1=vgpr("LsuReduction+%u"%localReadVgprIdx), comment=""))
-            elif kernel["ProblemType"]["ComputeDataType"].isInt32():
-              moduleReduction.add(VAddI32(dst=vgpr("LsuReduction+%u"%localReadVgprIdx), src0=vgpr(vgprStr), \
-                          src1=vgpr("LsuReduction+%u"%localReadVgprIdx), comment=""))
+      # Do Local Read
+      for i in range(0, numVgprPerLSU // self.LSUfullVw):
+        for v in range(numInstPerVW):
+          for r in range(0, kernel["LocalSplitU"]):
+            regIdx = (i * numInstPerVW + v) * regsPerStore
+            offset = r * ldsStride + regIdx * (bpr * kernel["WavefrontSize"])
+            if r == 0:
+              vgprStr = "LsuReduction+%u"%(localReadVgprIdx)
             else:
-              # TODO: hpa_half, int8
-              assert(0) # unsupported data type, need to modify here and LSU write/read code
+              vgprStr = inLoopTmpVgpr + (numTotalAccVgprLdsReduction * (r - 1) + regIdx)
+            module.add(DSLoadBX(dst=vgpr(vgprStr, regsPerStore), src=vgpr(addr), \
+              ds=DSModifiers(offset=(offset)), \
+              comment="r=%u i=%u, from acc[%d]"%(r, (i * numInstPerVW + v), neededAccVGPRIdx[0][(i * numInstPerVW + v)])))
+            # Generate Reduction code at the same time.
+            if r > 0:
+              for regToAdd in range(regsPerStore):
+                if kernel["ProblemType"]["ComputeDataType"].isSingle():
+                  moduleReduction.add(VAddF32(dst=vgpr("LsuReduction+%u"%(localReadVgprIdx+regToAdd)), src0=vgpr(vgprStr+regToAdd), \
+                              src1=vgpr("LsuReduction+%u"%(localReadVgprIdx+regToAdd)), comment=""))
+                elif kernel["ProblemType"]["ComputeDataType"].isInt32():
+                  moduleReduction.add(VAddI32(dst=vgpr("LsuReduction+%u"%(localReadVgprIdx+regToAdd)), src0=vgpr(vgprStr+regToAdd), \
+                              src1=vgpr("LsuReduction+%u"%(localReadVgprIdx+regToAdd)), comment=""))
+                else:
+                  # TODO: hpa_half, int8
+                  assert(0) # unsupported data type, need to modify here and LSU write/read code
+          localReadVgprIdx += regsPerStore
 
-        localReadVgprIdx += 1
+      # for i in range(0, numVgprPerLSU):
+      #   for r in range(0, kernel["LocalSplitU"]):
+      #     offset = r * ldsStride + i * (bpr * kernel["WavefrontSize"])
+      #     if r == 0:
+      #       vgprStr = "LsuReduction+%u"%(localReadVgprIdx)
+      #     else:
+      #       vgprStr = inLoopTmpVgpr + (numTotalAccVgprLdsReduction * (r - 1) + i)
+      #     module.add(DSLoadB32(dst=vgpr(vgprStr), src=vgpr(addr), \
+      #       ds=DSModifiers(offset=(offset)), comment="r=%u i=%u, from acc[%d]"%(r,i,neededAccVGPRIdx[0][i])))
+      #     # Generate Reduction code at the same time.
+      #     if r > 0:
+      #       if kernel["ProblemType"]["ComputeDataType"].isSingle():
+      #         moduleReduction.add(VAddF32(dst=vgpr("LsuReduction+%u"%localReadVgprIdx), src0=vgpr(vgprStr), \
+      #                     src1=vgpr("LsuReduction+%u"%localReadVgprIdx), comment=""))
+      #       elif kernel["ProblemType"]["ComputeDataType"].isInt32():
+      #         moduleReduction.add(VAddI32(dst=vgpr("LsuReduction+%u"%localReadVgprIdx), src0=vgpr(vgprStr), \
+      #                     src1=vgpr("LsuReduction+%u"%localReadVgprIdx), comment=""))
+      #       else:
+      #         # TODO: hpa_half, int8
+      #         assert(0) # unsupported data type, need to modify here and LSU write/read code
+      #   localReadVgprIdx += 1
 
+      # Release write/read resource
       self.vgprPool.checkIn(lsu_id)
       self.vgprPool.checkIn(addr)
       self.vgprPool.checkIn(lr1)
@@ -7975,13 +8014,12 @@ class KernelWriterAssembly(KernelWriter):
         module.add(SWaitCnt(vscnt=0))
       module.add(moduleReduction)
 
-    # free resource
-    #self.vgprPool.checkIn(baseAddr)
+      # Release reduction resource
+      self.vgprPool.checkIn(inLoopTmpVgpr)
     
     # reset vgprValuC register
     module.add(RegSet("v", "vgprValuC", self.accVgprLdsReduction))
-    if self.tempVgprLsuReduction is not None:
-      self.vgprPool.checkIn(self.tempVgprLsuReduction)
+
     return module
 
   ##############################################################################
