@@ -7909,12 +7909,6 @@ class KernelWriterAssembly(KernelWriter):
                 ds=DSModifiers(offset=(regIdx * (bpr * kernel["WavefrontSize"]))), \
                 comment="arch[%d]"%(i * numInstPerVW + v)))
 
-      # for i in range(numAccVgpr):
-      #   regIdx = i
-      #   module.add(DSStoreB32(dstAddr=vgpr(addr), src=vgpr(accVgprRes+regIdx), \
-      #         ds=DSModifiers(offset=(regIdx * 256)), #FIXME: dont hard code
-      #         comment="arch[%d]"%(i)))
-
       # Release local write resource
       self.vgprPool.checkIn(accVgprRes)
 
@@ -7967,6 +7961,14 @@ class KernelWriterAssembly(KernelWriter):
               ds=DSModifiers(offset=(offset)), \
               comment="r=%u i=%u, from acc[%d]"%(r, (i * numInstPerVW + v), neededAccVGPRIdx[0][(i * numInstPerVW + v)])))
             # Generate Reduction code at the same time.
+            if r == 0:
+              # Insert waitcnt code here
+              numTotalInst  = numVgprPerLSU // self.LSUfullVw * numInstPerVW * kernel["LocalSplitU"]
+              numPassedInst = (i * numInstPerVW + (v + 1)) * kernel["LocalSplitU"]
+              numLRWaitCnt = numTotalInst - numPassedInst
+              moduleReduction.add(SWaitCnt(lgkmcnt=numLRWaitCnt, comment="wait count is (%u-%u)"%(numTotalInst, numPassedInst)))
+              if self.states.archCaps["SeparateVscnt"]:
+                moduleReduction.add(SWaitCnt(vscnt=numLRWaitCnt))
             if r > 0:
               for regToAdd in range(regsPerStore):
                 if kernel["ProblemType"]["ComputeDataType"].isSingle():
@@ -7980,28 +7982,6 @@ class KernelWriterAssembly(KernelWriter):
                   assert(0) # unsupported data type, need to modify here and LSU write/read code
           localReadVgprIdx += regsPerStore
 
-      # for i in range(0, numVgprPerLSU):
-      #   for r in range(0, kernel["LocalSplitU"]):
-      #     offset = r * ldsStride + i * (bpr * kernel["WavefrontSize"])
-      #     if r == 0:
-      #       vgprStr = "LsuReduction+%u"%(localReadVgprIdx)
-      #     else:
-      #       vgprStr = inLoopTmpVgpr + (numTotalAccVgprLdsReduction * (r - 1) + i)
-      #     module.add(DSLoadB32(dst=vgpr(vgprStr), src=vgpr(addr), \
-      #       ds=DSModifiers(offset=(offset)), comment="r=%u i=%u, from acc[%d]"%(r,i,neededAccVGPRIdx[0][i])))
-      #     # Generate Reduction code at the same time.
-      #     if r > 0:
-      #       if kernel["ProblemType"]["ComputeDataType"].isSingle():
-      #         moduleReduction.add(VAddF32(dst=vgpr("LsuReduction+%u"%localReadVgprIdx), src0=vgpr(vgprStr), \
-      #                     src1=vgpr("LsuReduction+%u"%localReadVgprIdx), comment=""))
-      #       elif kernel["ProblemType"]["ComputeDataType"].isInt32():
-      #         moduleReduction.add(VAddI32(dst=vgpr("LsuReduction+%u"%localReadVgprIdx), src0=vgpr(vgprStr), \
-      #                     src1=vgpr("LsuReduction+%u"%localReadVgprIdx), comment=""))
-      #       else:
-      #         # TODO: hpa_half, int8
-      #         assert(0) # unsupported data type, need to modify here and LSU write/read code
-      #   localReadVgprIdx += 1
-
       # Release write/read resource
       self.vgprPool.checkIn(lsu_id)
       self.vgprPool.checkIn(addr)
@@ -8009,9 +7989,9 @@ class KernelWriterAssembly(KernelWriter):
       self.vgprPool.checkIn(tmpVgpr)
 
       # Do Reduction
-      module.add(SWaitCnt(lgkmcnt=0, vscnt=0, comment="wait for all reads"))
-      if self.states.archCaps["SeparateVscnt"]:
-        module.add(SWaitCnt(vscnt=0))
+      #module.add(SWaitCnt(lgkmcnt=0, vscnt=0, comment="wait for all reads"))
+      #if self.states.archCaps["SeparateVscnt"]:
+      #  module.add(SWaitCnt(vscnt=0))
       module.add(moduleReduction)
 
       # Release reduction resource
