@@ -26,7 +26,7 @@ from . import Common
 from .TensileInstructions import Item, TensileInstructions, slash50, replaceHolder, \
                           KernelBody, Module, StructuredModule, TextBlock, Dump, LabelManager, \
                           RegisterPool, Assert, fastdeepcopy, TensileInstructionsPassOptions, \
-                          TensileInstructionsPass, \
+                          TensileInstructionsPass, ValueSet, RegSet, \
                           SLongBranchPositive, SBranch, SCBranchSCC0, SCBranchSCC1
 from .TensileInstructions.Instructions import *
 from .KernelWriterModules import *
@@ -2588,6 +2588,32 @@ class KernelWriter(metaclass=abc.ABCMeta):
       ########################################
       self.states.inTailLoop = True
       module.addComment2("Tail Loop")
+      # self.vgprPool.add(self.states.a.startVgprValu , \
+      #     self.states.lastValuAB - self.states.a.startVgprValu, "ValuAB")
+      # module.addComment1("Tail: add ValuA/B vgpr buffer [%u...%u) to pool" % \
+      #     (self.states.a.startVgprValu, self.states.a.startVgprValu+self.states.lastValuAB))
+      # self.vgprPool.add(self.states.lastValuAB , \
+      #     self.states.lastVgprForReads - self.states.lastValuAB, "address vgpr")
+      # module.addComment1("Tail: add address/G2L vgpr [%u...%u) to pool" % \
+      #     (self.states.lastValuAB, self.states.lastVgprForReads))
+
+      #Re-alloc the VGPRs
+      #if kernel["DirectToVgprA"]:
+        # G2LA cannot be overlaped
+      #numVgprTail = max(self.states.lastValuAB, self.states.lastVgprForReads - self.states.lastValuAB)
+      #gprTail = self.vgprPool.checkOutAligned(numVgprTail, 2, preventOverflow=0)
+      #vgprTail = 0 #hack
+      #module.add(ValueSet(name="vgprValuA_X0_I0_BASE", value="UNDEF", format = -1))
+      #module.add(RegSet("v", "vgprValuA_X0_I0_BASE", vgprTail))
+      #module.add(ValueSet(name="vgprValuB_X0_I0_BASE", value="UNDEF", format = -1))
+      #module.add(RegSet("v", "vgprValuB_X0_I0_BASE", vgprTail + (self.states.b.startVgprValu - self.states.a.startVgprValu)))
+
+      #module.add(ValueSet(name="vgprG2LA_BASE", value="UNDEF", format = -1))
+      #module.add(RegSet("v", "vgprG2LA_BASE", vgprTail))
+      #module.add(ValueSet(name="vgprG2LB_BASE", value="UNDEF", format = -1))
+      #module.add(RegSet("v", "vgprG2LB_BASE", vgprTail + (self.states.b.startVgprG2L - self.states.a.startVgprG2L)))
+
+      #module.add(self.moduleVgprMacro)
 
       # need to unroll tail loop for the following cases
       mEnd = 1
@@ -2596,7 +2622,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
       if (kernel["DirectToVgprA"] or kernel["DirectToVgprB"] or kernel["DirectToLdsA"] or kernel["DirectToLdsB"]):
         mEnd = kernel["DepthU"]//(kernel["MatrixInstK"]*kernel["LocalSplitU"])
 
-      # TailLoop unroll case (mEnd > 1), we need to keep these vgpr
+      # FIXME: Add back. TailLoop unroll case (mEnd > 1), we need to keep these vgpr
       if mEnd == 1:
         # add vgprBuffer for local read to vgprPool because we won't issue local read in this section
         self.vgprPool.add(self.states.a.startVgprValu , \
@@ -2709,7 +2735,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
       if (kernel["AssertSummationElementMultiple"] % KinInnerUnroll == 0):
         tailLoopInnerUnroll = kernel["InnerUnroll"]
 
-      # TailLoop unroll case (mEnd > 1), we need to keep these vgpr
+      # FIXME: Add back. TailLoop unroll case (mEnd > 1), we need to keep these vgpr
       if mEnd == 1:
         # remove vgprBuffer for local read from vgprPool because we are ready to issue local read
         self.vgprPool.remove(self.states.a.startVgprValu , \
@@ -2786,13 +2812,25 @@ class KernelWriter(metaclass=abc.ABCMeta):
       module.add(self.closeLoop(kernel, tensorParametersA, tensorParametersB, -1, None, emitEndLabelOnly=True))
       # tail: close
       self.states.inTailLoop = False
-
+      # FIXME: Add back.
       if mEnd == 1:
         # remove address vgpr to vgprPool
         self.vgprPool.remove(self.states.lastValuAB , \
           self.states.lastVgprForReads - self.states.lastValuAB, "address vgpr") # Add as available
         module.addComment1("Tail: remove address/G2L [%u...%u) from pool" % \
                           (self.states.lastValuAB, self.states.lastVgprForReads))
+
+      #self.vgprPool.checkIn(vgprTail)
+      # #remove address vgpr to vgprPool
+      # self.vgprPool.remove(self.states.lastValuAB , \
+      #   self.states.lastVgprForReads - self.states.lastValuAB, "address vgpr") # Add as available
+      # module.addComment1("Tail: remove address/G2L [%u...%u) from pool" % \
+      #                   (self.states.lastValuAB, self.states.lastVgprForReads))
+      # #remove vgprBuffer for local read from vgprPool because we are ready to issue local read
+      # self.vgprPool.remove(self.states.a.startVgprValu , \
+      #   self.states.lastValuAB - self.states.a.startVgprValu , "ValuAB") # remove from pool
+      # module.addComment1("Tail: remove ValuA/B vgpr buffer [%u...%u) from pool" % \
+      #                   (self.states.a.startVgprValu , self.states.lastValuAB))
 
     if self.do["executeToLoopEnd"]:
       module.add(self.functionEnd(kernel, addLabel=False))
@@ -3660,6 +3698,68 @@ class KernelWriter(metaclass=abc.ABCMeta):
         vgprIdx = self.states.totalMixedAgprs
         self.states.c.numVgprValu = self.states.totalMixedAgprs
 
+    #----------------------------------
+    # Move to the front and bypass to tail loop
+    if not kernel["LocalWriteUseSgprA"]:
+      self.states.a.startVgprLocalWriteAddr = vgprIdx
+      vgprIdx += self.states.a.numVgprLocalWriteAddr
+
+    if not kernel["LocalWriteUseSgprB"]:
+      self.states.b.startVgprLocalWriteAddr = vgprIdx
+      vgprIdx += self.states.b.numVgprLocalWriteAddr
+
+    if kernel["ProblemType"]["Sparse"] and not kernel["DirectToVgprSparseMetadata"]:
+      if self.states.combineLocalAddresses:
+        self.states.m.startVgprLocalWriteAddr = self.states.m.startVgprLocalReadAddr
+      else:
+        self.states.m.startVgprLocalWriteAddr = vgprIdx
+        vgprIdx += self.states.m.numVgprLocalWriteAddr
+
+    # BufferLoad:
+    # Uses a resource descriptor (SRD) which is stored in 4 SGPRs and thus shared by all work-items.
+    # Each work-item also uses  a unique 32-bit offset into vgprGlobalReadOffset.  These offsets are set when
+    # the tile is initialized and stay constant through the execution of the kernel.
+    # The base address in the SRD is updated when the algorithm moves to a new tile
+    # BufferLoad disables the gptGlobalReadAddr used in flat addressing.
+    if kernel["BufferLoad"]:
+      self.startVgprGlobalReadOffsetA = vgprIdx
+      vgprIdx += 1 if kernel["_UseSgprForGRO"] else self.states.a.numVgprGlobalReadOffsets
+      self.startVgprGlobalReadOffsetB = vgprIdx
+      vgprIdx += 1 if kernel["_UseSgprForGRO"] else self.states.b.numVgprGlobalReadOffsets
+      if kernel["ProblemType"]["Sparse"]:
+        self.startVgprGlobalReadOffsetMetadata = vgprIdx
+        if kernel["DirectToVgprSparseMetadata"]:
+          miWaveTile = kernel["MIWaveTileB"] if kernel["ProblemType"]["Sparse"] == 2 else kernel["MIWaveTileA"]
+          vgprIdx += miWaveTile
+        else:
+          vgprIdx += 1 if kernel["_UseSgprForGRO"] else self.states.m.numVgprGlobalReadOffsets
+    else:
+      # TODO: alignment hack, figure out a better solution
+      vgprIdx = ((vgprIdx+1)//2)*2
+      self.startVgprGlobalReadAddressesA = vgprIdx
+      vgprIdx += numVgprGlobalReadAddressesA
+      self.startVgprGlobalReadAddressesB = vgprIdx
+      vgprIdx += numVgprGlobalReadAddressesB
+
+    self.startVgprGlobalReadIncsA = vgprIdx
+    vgprIdx += numVgprGlobalReadIncsA
+    self.startVgprGlobalReadIncsB = vgprIdx
+    vgprIdx += numVgprGlobalReadIncsB
+    if kernel["ProblemType"]["Sparse"] and not kernel["DirectToVgprSparseMetadata"]:
+      self.startVgprGlobalReadIncsMetadata = vgprIdx
+      vgprIdx += numVgprGlobalReadIncsMetadata
+    
+    self.states.a.startVgprLocalReadAddr = vgprIdx
+    vgprIdx += self.states.a.numVgprLocalReadAddr
+
+    self.states.b.startVgprLocalReadAddr = vgprIdx
+    vgprIdx += self.states.b.numVgprLocalReadAddr
+
+    if kernel["ProblemType"]["Sparse"] and not kernel["DirectToVgprSparseMetadata"]:
+      self.states.m.startVgprLocalReadAddr = vgprIdx
+      vgprIdx += self.states.m.numVgprLocalReadAddr
+
+    # ----------------------------
     # TODO: alignment hack, figure out a better solution
     vgprIdx = ((vgprIdx+1)//2)*2
     # Avoid bank conflict between VgprA and VgprC
@@ -3783,62 +3883,13 @@ class KernelWriter(metaclass=abc.ABCMeta):
     # code
     if kernel["PrefetchGlobalRead"]:
       self.states.lastValuAB = vgprIdx
-    #----------------------------------
 
-    if not kernel["LocalWriteUseSgprA"]:
-      self.states.a.startVgprLocalWriteAddr = vgprIdx
-      vgprIdx += self.states.a.numVgprLocalWriteAddr
-
-    if not kernel["LocalWriteUseSgprB"]:
-      self.states.b.startVgprLocalWriteAddr = vgprIdx
-      vgprIdx += self.states.b.numVgprLocalWriteAddr
-
-    if kernel["ProblemType"]["Sparse"] and not kernel["DirectToVgprSparseMetadata"]:
-      if self.states.combineLocalAddresses:
-        self.states.m.startVgprLocalWriteAddr = self.states.m.startVgprLocalReadAddr
-      else:
-        self.states.m.startVgprLocalWriteAddr = vgprIdx
-        vgprIdx += self.states.m.numVgprLocalWriteAddr
-
-    # BufferLoad:
-    # Uses a resource descriptor (SRD) which is stored in 4 SGPRs and thus shared by all work-items.
-    # Each work-item also uses  a unique 32-bit offset into vgprGlobalReadOffset.  These offsets are set when
-    # the tile is initialized and stay constant through the execution of the kernel.
-    # The base address in the SRD is updated when the algorithm moves to a new tile
-    # BufferLoad disables the gptGlobalReadAddr used in flat addressing.
-    if kernel["BufferLoad"]:
-      self.startVgprGlobalReadOffsetA = vgprIdx
-      vgprIdx += 1 if kernel["_UseSgprForGRO"] else self.states.a.numVgprGlobalReadOffsets
-      self.startVgprGlobalReadOffsetB = vgprIdx
-      vgprIdx += 1 if kernel["_UseSgprForGRO"] else self.states.b.numVgprGlobalReadOffsets
-      if kernel["ProblemType"]["Sparse"]:
-        self.startVgprGlobalReadOffsetMetadata = vgprIdx
-        if kernel["DirectToVgprSparseMetadata"]:
-          miWaveTile = kernel["MIWaveTileB"] if kernel["ProblemType"]["Sparse"] == 2 else kernel["MIWaveTileA"]
-          vgprIdx += miWaveTile
-        else:
-          vgprIdx += 1 if kernel["_UseSgprForGRO"] else self.states.m.numVgprGlobalReadOffsets
-    else:
-      # TODO: alignment hack, figure out a better solution
-      vgprIdx = ((vgprIdx+1)//2)*2
-      self.startVgprGlobalReadAddressesA = vgprIdx
-      vgprIdx += numVgprGlobalReadAddressesA
-      self.startVgprGlobalReadAddressesB = vgprIdx
-      vgprIdx += numVgprGlobalReadAddressesB
-
-    self.startVgprGlobalReadIncsA = vgprIdx
-    vgprIdx += numVgprGlobalReadIncsA
-    self.startVgprGlobalReadIncsB = vgprIdx
-    vgprIdx += numVgprGlobalReadIncsB
-    if kernel["ProblemType"]["Sparse"] and not kernel["DirectToVgprSparseMetadata"]:
-      self.startVgprGlobalReadIncsMetadata = vgprIdx
-      vgprIdx += numVgprGlobalReadIncsMetadata
     #-----------
 
     if self.states.a.startVgprG2L is None and self.states.a.numVgprG2LAllocated > 0:
       # TODO: alignment hack, figure out a better solution
       vgprIdx = ((vgprIdx+1)//2)*2
-      self.states.a.startVgprG2L = vgprIdx;
+      self.states.a.startVgprG2L = vgprIdx
       if kernel["ULSGRODoubleG2L"] == 1:
         vgprIdx += self.states.a.numVgprG2LAllocated*2
       else:
@@ -3847,7 +3898,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
     if self.states.b.startVgprG2L is None and self.states.b.numVgprG2LAllocated > 0:
       # TODO: alignment hack, figure out a better solution
       vgprIdx = ((vgprIdx+1)//2)*2
-      self.states.b.startVgprG2L = vgprIdx;
+      self.states.b.startVgprG2L = vgprIdx
       if kernel["ULSGRODoubleG2L"] == 1:
         vgprIdx += self.states.b.numVgprG2LAllocated*2
       else:
@@ -3858,16 +3909,6 @@ class KernelWriter(metaclass=abc.ABCMeta):
         # TODO: alignment hack, figure out a better solution
         vgprIdx = ((vgprIdx+1)//2)*2
         self.states.m.startVgprG2L = vgprIdx; vgprIdx += self.states.m.numVgprG2LAllocated
-
-    self.states.a.startVgprLocalReadAddr = vgprIdx
-    vgprIdx += self.states.a.numVgprLocalReadAddr
-
-    self.states.b.startVgprLocalReadAddr = vgprIdx
-    vgprIdx += self.states.b.numVgprLocalReadAddr
-
-    if kernel["ProblemType"]["Sparse"] and not kernel["DirectToVgprSparseMetadata"]:
-      self.states.m.startVgprLocalReadAddr = vgprIdx
-      vgprIdx += self.states.m.numVgprLocalReadAddr
 
     # GlobalRead, LocalWrite, LocalRead, G2L can be reclaimed, extend the "lastVgprForReads" value
     if kernel["PrefetchGlobalRead"]:
