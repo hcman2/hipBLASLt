@@ -927,8 +927,9 @@ class KernelWriter(metaclass=abc.ABCMeta):
         for vacancy in self.localReadsVacancy:
           # {"items","latencyLeft","atIter","atMfmaIndex","noReadsAtThisIter"}
           for localRead in list(localReadItemsThisLoop):
-            if vacancy["latencyLeft"] >= localRead.issueLatency() * 2:
-              vacancy["latencyLeft"] -= localRead.issueLatency() * 2
+            if vacancy["latencyLeft"] >= localRead.issueLatency() + 1:
+              # This *2 is due to 2 SIMDs share 1 LR slot.
+              vacancy["latencyLeft"] -= localRead.issueLatency() + 1
               vacancy["items"].add(localRead)
               localReadItemsThisLoop.remove(localRead)
               if vacancy["atMfmaIndex"] > self.states.sync1LdsMfmaIndex and kernel["1LDSBuffer"]:
@@ -959,6 +960,27 @@ class KernelWriter(metaclass=abc.ABCMeta):
       if iteration == 0:
         self.localReadThisLoopFIFO = []
         self.localReadNextLoopFIFO = []
+      self.localReadFakeLoopFIFO = None
+      def simLocalReadFIFOFull(currentMFMA, fifo, latencyLeft):
+        numWaves = kernel["MIWaveGroup"][0] * kernel["MIWaveGroup"][1] * kernel["LocalSplitU"]
+        # Check latency availability.
+        numLR = latencyLeft // DSLoadB128.issueLatency()
+        numToBeIssued = 0
+        for n in range(numLR):
+          # The FIFO length is 16 so that each wave has 16/numWaves buffer.
+          lrStallLatencyBuffer = 40 - ((16 / numWaves) * self.states.miLatency)
+          if len(fifo) < (16 / numWaves):
+            fifo.append(currentMFMA)
+          else:
+            oldMFMA = fifo[0]
+            if (currentMFMA - oldMFMA) * self.states.miLatency >= lrStallLatencyBuffer:
+              fifo.pop(0)
+              fifo.append(currentMFMA)
+            else:
+              break
+          numToBeIssued += 1
+        return numToBeIssued * DSLoadB128.issueLatency()
+
       def checkLocalReadFIFOFull(currentMFMA, fifo, lrItems, numLR, numLREven):
         numWaves = kernel["MIWaveGroup"][0] * kernel["MIWaveGroup"][1] * kernel["LocalSplitU"]
         if numLREven >= 1.0:
@@ -1108,13 +1130,17 @@ class KernelWriter(metaclass=abc.ABCMeta):
             localReadsIssuedInThisIter += 1
             if (i == 0):
               localReadsWaitcnt += 1
+        if not localReadItemsThisLoop and self.localReadFakeLoopFIFO is None:
+          self.localReadFakeLoopFIFO = fastdeepcopy(self.localReadThisLoopFIFO)
         if not localReadItemsThisLoop and latencyLeft > 0 and iteration < isBarrier and \
-            not(mfmaIndex > self.states.sync1LdsMfmaIndex and kernel["1LDSBuffer"]):
+            not(mfmaIndex > self.states.sync1LdsMfmaIndex and kernel["1LDSBuffer"]): # and \
+            #self.localReadFakeLoopFIFO is not None:
           item = Module()
-          item.addComment0("localReadsVacancy: latencyLeft %d"%(latencyLeft))
+          numLatency = simLocalReadFIFOFull(mfmaIndex, self.localReadFakeLoopFIFO, latencyLeft)
+          item.addComment0("localReadsVacancy: latencyLeft %d"%(numLatency))
           iterCode.add(item)
           self.localReadsVacancy.append({ "items": item, \
-                                          "latencyLeft": latencyLeft, \
+                                          "latencyLeft": numLatency, \
                                           "atIter": iteration, \
                                           "atMfmaIndex": mfmaIndex, \
                                           "noReadsAtThisIter": numReadsInst == 0, \
@@ -4317,6 +4343,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
       self.states.miLatency = kernel["MatrixInstM"] // mi_divisor
 
       # give 1 quad-cycle buffer to prevend bubble from sync
+      # TODO: Why -1 here?
       miLatencyBuffer = 1
       self.states.miLatencyLeft = max(self.states.miLatency - miLatencyBuffer - miIssueLatency,0)
 

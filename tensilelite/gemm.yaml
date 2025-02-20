@@ -1,0 +1,110 @@
+GlobalParameters:
+  # MinimumRequiredVersion: 4.14.0
+  # ForceRedoBenchmarkProblems: False
+  # ForceRedoLibraryLogic: False
+  # ForceRedoLibraryClient: False
+  # MergeFiles: False
+  ForceGenerateKernel: True
+  # CMakeBuildType: Debug
+  NumElementsToValidate: 0
+  # ValidationPrintValids: True
+  # ValidationMaxToPrint: 256
+  NumWarmups: 100
+  NumBenchmarks: 1
+  SyncsPerBenchmark: 1
+  EnqueuesPerSync: 1000
+  # MinFlopsPerSync: 10737418240
+  # MaxEnqueuesPerSync: 20
+  SleepPercent: 0
+  #PrintSolutionRejectionReason: True
+  #PrintWinnersOnly: True
+  DataInitTypeA: 23
+  DataInitTypeB: 24
+  # DataInitTypeC: 0
+  # DataInitTypeD: 3
+  DataInitTypeBeta: 0
+  DataInitTypeAlpha: 1
+  DataInitTypeBias: 0
+  DataInitTypeScaleAlphaVec: 1
+  DataInitTypeScaleA: 1
+  DataInitTypeScaleB: 1
+  CSVExportWinner: 1
+  CSVMergeSameProblemID: 1
+  Device: 5
+  # CpuThreads: 1
+  # ShortNames: 1
+  MinKForGSU: 64
+  MaxWorkspaceSize: 3355443200
+  # BoundsCheck: 4
+  MaxFileName: 256
+  KernelTime: True
+  # CEqualD: True
+  # PristineOnGPU: False
+  # HardwareMonitor: False
+  # PrintCodeCommands: True
+  # PrintLevel: 2
+  # UseUserArgs: True
+  RotatingBufferSize: 512 
+  SkipSlowSolutionRatio: 0.75
+  KeepBuildTmp: True
+  AsmDebug: True
+
+BenchmarkProblems:
+
+  #######################################
+  # TN - standard
+  #######################################
+  -
+    - # ProblemType
+      OperationType: GEMM
+      DataType: b
+      DestDataType: b
+      ComputeDataType: s
+      HighPrecisionAccumulate: True
+      TransposeA: 0
+      TransposeB: 0
+      UseBeta: True
+      UseBias: 1
+      Batched: True
+      Activation: True
+      ActivationType: all
+    - # BenchmarkProblemSizeGroup - Standard
+      InitialSolutionParameters:
+      BenchmarkCommonParameters:
+        - KernelLanguage: ["Assembly"]
+        #- EdgeType: ["ShiftPtr"]
+      ForkParameters:
+        - MatrixInstruction:
+          - [16, 16, 16, 1, 1, 8, 6, 2, 2 ]
+          # - [16, 16, 16, 1, 1, 4, 12, 4, 1 ]
+          # - [16, 16, 16, 1, 1, 16, 3, 1, 4 ]
+
+        - PrefetchGlobalRead: [2]
+        - PrefetchLocalRead: [1]
+        - ClusterLocalRead: [1]
+        - DepthU: [64]
+        #- LocalReadVectorWidth: [8] #
+        - ScheduleIterAlg: [3]
+        - ExpandPointerSwap: [0]       #
+        - TransposeLDS: [1]
+        - LdsBlockSizePerPadA: [-1]  #
+        - LdsBlockSizePerPadB: [-1]  #
+        - LdsPadA: [-1]
+        - LdsPadB: [-1]
+        - 1LDSBuffer: [-1]
+        #- GlobalSplitU: [1,2]
+        - GlobalSplitUAlgorithm: ["MultipleBuffer"]
+        - SourceSwap: [1]
+        #- StoreRemapVectorWidth: [-1,0,4]
+        #- DirectToVgprSparseMetadata: [0]
+        #- WorkGroupMapping: [18]
+        #- StoreVectorWidth: [-1]
+      BenchmarkForkParameters:
+      JoinParameters:
+      BenchmarkJoinParameters:
+      BenchmarkFinalParameters:
+        - ProblemSizes:
+          - Exact: [4096, 3724, 1, 8192] # classic format
+        - BiasTypeArgs: ['s']
+        - ActivationArgs:
+          - [Enum: relu]
