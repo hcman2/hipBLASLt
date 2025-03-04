@@ -249,6 +249,7 @@ namespace TensileLite
         {
             Granularities granularities;
 
+            double microSeconds = 0.0;
             double speedGFlops = 0.0; //! final gflops projection
             int    CUs         = 0;
 

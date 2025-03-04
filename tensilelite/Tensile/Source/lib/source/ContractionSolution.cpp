@@ -3305,6 +3305,61 @@ namespace TensileLite
         pp.speedGFlops = IdealGranularityPerf * pp.granularities.totalGranularity;
         pp.CUs         = NumCUs;
 
+        // test only code
+        double L2BandWidthPerCU  = 128;  //bytes/clk
+        double maxBandWidthHBM   = 3.0; //TB/s
+        double mem_frequency     = 1300;//MHz
+        double hbmBandWidth      = maxBandWidthHBM * 1000000 / mem_frequency;
+        double initialCost       = 1.0; //us
+        double math_frequency    = 1100;//MHz
+        double flopsPerClk       = 2048;
+
+        double totalOps = M * N * NumBatches * K * 2 / 1000000;
+        double store = M * N * 2 / maxBandWidthHBM / 1000000;
+        double math_clk = MT0 * MT1 * 2 / flopsPerClk;
+        int M_WGs_total = CeilDivide(M, MT0);
+        int N_WGs_total = CeilDivide(N, MT1);
+        int WGM = 6;
+        int N_WGs_per_tile = std::min(WGM,N_WGs_total);
+        int M_WGs_per_tile = std::min(M_WGs_total,CeilDivide(int(NumCUs/8), N_WGs_per_tile));
+        double A_L2_hit = 0.0;
+        double B_L2_hit = 0.0;
+        if ((M + MT1 * N_WGs_per_tile) * K  * 2 < 4 * 1024 * 1024 * 8)
+        {
+            A_L2_hit = 1 - double(1.0 / N_WGs_total);
+        }
+        else
+        {
+            A_L2_hit = 1 - double(M_WGs_per_tile / (NumCUs/8));
+        }
+        if ((MT0 * M_WGs_per_tile + MT1 * N_WGs_per_tile) * K  * 2 < 4 * 1024 * 1024 * 8)
+        {
+            B_L2_hit = 1 - double(1.0 / M_WGs_total);
+        }
+        else
+        {
+            B_L2_hit = 1 - double(N_WGs_per_tile / (NumCUs/8));
+        }
+        double A_L2_clk = MT0 * 2 * A_L2_hit / std::min(L2BandWidthPerCU,double(128*16/N_WGs_per_tile/M_WGs_per_tile));
+        double A_hbm_clk = MT0 * 2 * (1 - A_L2_hit) / (hbmBandWidth/std::min(int(NumCUs),M_WGs_total*N_WGs_total));
+        double B_L2_clk = MT1 * 2 * B_L2_hit / std::min(L2BandWidthPerCU,double(128*16/N_WGs_per_tile/M_WGs_per_tile));
+        double B_hbm_clk = MT1 * 2 * (1 - B_L2_hit) / (hbmBandWidth/std::min(int(NumCUs),M_WGs_total*N_WGs_total));
+        double num_tiles = CeilDivide(M_WGs_total * N_WGs_total * NumBatches, NumCUs);
+        double perf = initialCost + std::max(math_clk, A_L2_clk + A_hbm_clk + B_L2_clk + B_hbm_clk) * K / math_frequency * num_tiles + store;
+
+        pp.microSeconds = perf;
+#if 0
+        std::cout<<"MT0               =          "<<MT0<<std::endl;
+        std::cout<<"MT1               =          "<<MT1<<std::endl;
+        std::cout<<"NumCUs            =          "<<NumCUs<<std::endl;
+        std::cout<<"initialCost       =          "<<initialCost<<std::endl;
+        std::cout<<"flopsPerClk       =          "<<flopsPerClk<<std::endl;
+        std::cout<<"A_L2_hit          =          "<<A_L2_hit<<std::endl;
+        std::cout<<"B_L2_hit          =          "<<B_L2_hit<<std::endl;
+        std::cout<<"M_WGs_per_tile    =          "<<M_WGs_per_tile<<std::endl;
+        std::cout<<"N_WGs_per_tile    =          "<<N_WGs_per_tile<<std::endl;
+        std::cout<<"=================="<<perf<<" us"<<std::endl;
+#endif
         return pp;
     }
 
@@ -3438,6 +3493,7 @@ namespace TensileLite
                       << " waveGranularity=" << pp.granularities.waveGranularity
 
                       << " speedGFlops=" << pp.speedGFlops
+                      << " microSeconds=" << pp.microSeconds
 
                       << " staticModel=[ " << pp.staticModel << " ]";
     }

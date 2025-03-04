@@ -320,6 +320,9 @@ globalParameters["MinKForGSU"] = 32  # min K size to use GlobalSplitU algorithm 
 # control if a solution is run for a given problem
 globalParameters["GranularityThreshold"] = 0.0
 
+# control if a solution is run for a given performance prediction
+globalParameters["PredictionThreshold"] = 1.0
+
 globalParameters["PristineOnGPU"] = (
     True  # use Pristine memory on Tensile trainning verification or not
 )
