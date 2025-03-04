@@ -3305,6 +3305,39 @@ namespace TensileLite
         pp.speedGFlops = IdealGranularityPerf * pp.granularities.totalGranularity;
         pp.CUs         = NumCUs;
 
+        // test only code
+        double L2andWidthPerCU   = 64;  //bytes/clk
+        double maxBandWidthHBM   = 3.6; //TB/s
+        double initialCost       = 1.0; //us
+        double frequency         = 1100;//MHz
+        double hbmBandWidthPerCU = maxBandWidthHBM / L2andWidthPerCU * 1000000 / frequency;
+        double bestL2            = 0.5;
+        double flopsPerClk       = 2048;
+
+        double totalOps = M * N * NumBatches * K * 2 / 1000000;
+        double tmp0 = M * N * K * 2 / maxBandWidthHBM / 1000000;
+        double tmp1 = MT0 * MT1 * 2 / flopsPerClk;
+        double tmp2 = MT0 * 2 * std::min(bestL2, 1 - (1 / CeilDivide(N, MT1))) / L2andWidthPerCU;
+        double tmp3 = MT0 * 2 * std::max(1 - bestL2, (1 / CeilDivide(N, MT1))) / hbmBandWidthPerCU;
+        double tmp4 = MT1 * 2 * std::min(bestL2, 1 - (1 / CeilDivide(M, MT0))) / L2andWidthPerCU;
+        double tmp5 = MT1 * 2 * std::max(1 - bestL2, (1 / CeilDivide(M, MT0))) / hbmBandWidthPerCU;
+        double tmp6 = CeilDivide(CeilDivide(M, MT0) * CeilDivide(N, MT1) * NumBatches, NumCUs);
+        double perf = initialCost + std::max(tmp1, tmp2 + tmp3 + tmp4 + tmp5) * K / frequency * tmp6;
+
+        pp.microSeconds = perf;
+#if 0
+        std::cout<<"MT0               =          "<<MT0<<std::endl;
+        std::cout<<"MT1               =          "<<MT1<<std::endl;
+        std::cout<<"NumCUs            =          "<<NumCUs<<std::endl;
+        std::cout<<"L2andWidthPerCU   =          "<<L2andWidthPerCU<<std::endl;
+        std::cout<<"maxBandWidthHBM   =          "<<maxBandWidthHBM<<std::endl;
+        std::cout<<"initialCost       =          "<<initialCost<<std::endl;
+        std::cout<<"frequency         =          "<<frequency<<std::endl;
+        std::cout<<"hbmBandWidthPerCU =          "<<hbmBandWidthPerCU<<std::endl;
+        std::cout<<"bestL2            =          "<<bestL2<<std::endl;
+        std::cout<<"flopsPerClk       =          "<<flopsPerClk<<std::endl;
+        std::cout<<"=================="<<perf<<" us"<<std::endl;
+#endif
         return pp;
     }
 
@@ -3438,6 +3471,7 @@ namespace TensileLite
                       << " waveGranularity=" << pp.granularities.waveGranularity
 
                       << " speedGFlops=" << pp.speedGFlops
+                      << " microSeconds=" << pp.microSeconds
 
                       << " staticModel=[ " << pp.staticModel << " ]";
     }

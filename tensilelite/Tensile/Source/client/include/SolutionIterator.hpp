@@ -32,6 +32,8 @@
 
 #include <functional>
 #include <vector>
+#include <map>
+#include <queue>
 
 #include "RunListener.hpp"
 
@@ -149,6 +151,7 @@ namespace TensileLite
             AllSolutionsIterator(
                 std::shared_ptr<MasterSolutionLibrary<ContractionProblemGemm>> library,
                 std::shared_ptr<Hardware>                                      hardware,
+                double                                                         predictionThreshold,
                 int                                                            firstSolutionIdx,
                 int                                                            numSolutions,
                 bool                                                           printWinnerOnly,
@@ -165,6 +168,11 @@ namespace TensileLite
             virtual bool                                 runCurrentSolution() override;
 
         private:
+            std::vector<std::shared_ptr<ContractionSolution>> m_solutions;
+            std::queue<int>                                   m_qSolutionIdx;
+
+            double m_predictionThreshold;
+
             int m_firstSolutionIdx;
             int m_lastSolutionIdx;
 
