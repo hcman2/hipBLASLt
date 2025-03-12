@@ -1331,6 +1331,7 @@ class Solution(collections.abc.Mapping):
       else:
         reject(state, "EnableMatrixInstruction undetermined")
 
+    state["CUOccupancy"] = -1
     if EnableMatrixInstruction == True:
       state["MatrixInstM"]         = state["MIBlock"][0]
       state["MatrixInstN"]         = state["MIBlock"][1]

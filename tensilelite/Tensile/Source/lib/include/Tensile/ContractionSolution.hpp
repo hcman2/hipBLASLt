@@ -149,6 +149,8 @@ namespace TensileLite
         int  workGroupMappingXCCGroup               = 0;
         bool globalSplitUCoalesced                  = false;
         bool globalSplitUWorkGroupMappingRoundRobin = false;
+
+        int CUOccupancy = 0;
     };
 
     /**

@@ -79,6 +79,7 @@ class KernelCodeGenResult(NamedTuple):
     targetObjFilename: str
     isa: IsaVersion
     wavefrontSize: int
+    cuoccupancy: int
 
 
 def processKernelSource(kernelWriterAssembly, ti, kernel) -> KernelCodeGenResult:
@@ -94,7 +95,7 @@ def processKernelSource(kernelWriterAssembly, ti, kernel) -> KernelCodeGenResult
     objFilename = kernel._state.get("codeObjectFile", None)
 
     return KernelCodeGenResult(
-        err, src, header, asmFilename, objFilename, tuple(kernel["ISA"]), kernel["WavefrontSize"]
+        err, src, header, asmFilename, objFilename, tuple(kernel["ISA"]), kernel["WavefrontSize"], kernel["CUOccupancy"]
     )
 
 
@@ -145,7 +146,17 @@ def removeInvalidSolutionsAndKernels(results, kernels, solutions, errorTolerant,
     for rel in removeResults:
         results.remove(rel)
 
-
+def passPostKernelInfoToSolution(results, kernels, solutions):
+    for solution in solutions:
+        solutionKernels = solution.getKernels()
+        for kernel in solutionKernels:
+            kName = Solution.getKeyNoInternalArgs(kernel)
+            for kernIdx, r in enumerate(results):
+                if kName == Solution.getKeyNoInternalArgs(kernels[kernIdx]):
+                    solution._state["CUOccupancy"] = r.cuoccupancy
+                    break
+            break
+    
 def writeAssembly(asmPath: Union[Path, str], result: KernelCodeGenResult):
     if result.err:
         printExit(f"Failed to build kernel {result.name} because it has error code {result.err}")
@@ -237,6 +248,9 @@ def writeSolutionsAndKernels(
     asmResults = ParallelMap2(processKernelSource, asmIter, "Generating assembly kernels")
     removeInvalidSolutionsAndKernels(
         asmResults, asmKernels, solutions, errorTolerant, globalParameters
+    )
+    passPostKernelInfoToSolution(
+        asmResults, asmKernels, solutions
     )
 
     def assemble(ret):

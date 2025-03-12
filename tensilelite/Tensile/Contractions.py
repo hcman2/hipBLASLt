@@ -564,7 +564,8 @@ class SizeMapping:
                  'workGroupMappingXCC',
                  'workGroupMappingXCCGroup',
                  'globalSplitUCoalesced',
-                 'globalSplitUWorkGroupMappingRoundRobin'
+                 'globalSplitUWorkGroupMappingRoundRobin',
+                 'CUOccupancy'
                  ]
 
     @classmethod
@@ -607,7 +608,8 @@ class SizeMapping:
                    workGroupMappingXCC      = d['WorkGroupMappingXCC'],
                    workGroupMappingXCCGroup = d['WorkGroupMappingXCCGroup'],
                    globalSplitUCoalesced    = d['GlobalSplitUCoalesced'],
-                   globalSplitUWorkGroupMappingRoundRobin = d['GlobalSplitUWorkGroupMappingRoundRobin']
+                   globalSplitUWorkGroupMappingRoundRobin = d['GlobalSplitUWorkGroupMappingRoundRobin'],
+                   CUOccupancy              = d['CUOccupancy']
                    )
 
     @classmethod

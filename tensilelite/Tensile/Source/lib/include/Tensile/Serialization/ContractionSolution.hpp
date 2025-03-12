@@ -121,6 +121,8 @@ namespace TensileLite
                 iot::mapRequired(io,
                                  "globalSplitUWorkGroupMappingRoundRobin",
                                  s.globalSplitUWorkGroupMappingRoundRobin);
+
+                iot::mapRequired(io, "CUOccupancy", s.CUOccupancy);
             }
 
             const static bool flow = false;
